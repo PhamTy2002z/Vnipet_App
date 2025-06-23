@@ -3,7 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { Dimensions, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { authService } from '../api/services/authService';
+import { getDeviceInfo } from '../api/utils/deviceUtils';
+import SuccessNotification from '../components/SuccessNotification';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,10 +15,75 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
 
-  const handleSignup = () => {
-    // Implement signup logic here
+  const validateInputs = () => {
+    if (!fullName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập họ tên');
+      return false;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email hợp lệ');
+      return false;
+    }
+    if (!phoneNumber.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+      return false;
+    }
+    if (password.length < 6) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      return false;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSignup = async () => {
+    // Validate inputs before submitting
+    if (!validateInputs()) return;
+
+    try {
+      setIsLoading(true);
+
+      // Lấy thông tin thiết bị
+      const deviceInfo = await getDeviceInfo();
+
+      // Chuẩn bị dữ liệu đăng ký
+      const userData = {
+        name: fullName,
+        email,
+        phone: phoneNumber,
+        password,
+        confirmPassword
+      };
+
+      // Gọi API đăng ký
+      const result = await authService.register(userData);
+
+      if (result.success) {
+        // Đăng ký thành công - hiển thị thông báo animation
+        setShowSuccessNotification(true);
+      } else {
+        // Đăng ký thất bại
+        Alert.alert('Đăng ký thất bại', result.message || 'Vui lòng thử lại');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert('Lỗi đăng ký', 'Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessNotification(false);
     router.replace('/(tabs)');
   };
 
@@ -117,13 +185,50 @@ export default function SignupScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.registerButton} onPress={handleSignup}>
-                <Text style={styles.registerButtonText}>Register</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Confirm Password</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                    placeholder="********"
+                    placeholderTextColor="#999"
+                  />
+                  <Pressable 
+                    style={styles.passwordToggle}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color="#888" />
+                  </Pressable>
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.registerButton, isLoading && styles.registerButtonDisabled]} 
+                onPress={handleSignup}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <Text style={styles.registerButtonText}>Register</Text>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
+
+      <SuccessNotification 
+        visible={showSuccessNotification}
+        title="Đăng ký thành công"
+        message="Tài khoản của bạn đã được tạo thành công!"
+        onClose={handleSuccessClose}
+        autoClose={true}
+        closeDuration={1500}
+      />
     </>
   );
 }
@@ -241,9 +346,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 10,
   },
+  registerButtonDisabled: {
+    backgroundColor: '#9CB2E5',
+  },
   registerButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+});

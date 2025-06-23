@@ -3,7 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { Dimensions, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { authService } from '../api/services/authService';
+import { getDeviceInfo } from '../api/utils/deviceUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,10 +14,37 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // Implement login logic here
-    router.replace('/(tabs)');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ email và mật khẩu');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Lấy thông tin thiết bị
+      const deviceInfo = await getDeviceInfo();
+      
+      // Gọi API đăng nhập
+      const result = await authService.login(email, password);
+      
+      if (result.success) {
+        // Đăng nhập thành công
+        console.log('Đăng nhập thành công:', result.user);
+        router.replace('/(tabs)');
+      } else {
+        // Đăng nhập thất bại
+        Alert.alert('Đăng nhập thất bại', result.message || 'Vui lòng kiểm tra email và mật khẩu');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Lỗi đăng nhập', 'Đã có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const navigateToSignup = () => {
@@ -99,8 +128,16 @@ export default function LoginScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                  <Text style={styles.loginButtonText}>Log In</Text>
+                <TouchableOpacity 
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Log In</Text>
+                  )}
                 </TouchableOpacity>
 
                 <View style={styles.dividerContainer}>
@@ -252,10 +289,13 @@ const styles = StyleSheet.create({
   loginButton: {
     backgroundColor: '#2567E8',
     height: 50,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
     marginBottom: 20,
+  },
+  loginButtonDisabled: {
+    backgroundColor: '#9CB2E5',
   },
   loginButtonText: {
     color: 'white',
@@ -273,8 +313,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   dividerText: {
+    color: '#777',
     marginHorizontal: 10,
-    color: '#666',
+    fontSize: 14,
   },
   socialButton: {
     flexDirection: 'row',
@@ -284,21 +325,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 15,
     backgroundColor: '#fff',
+  },
+  googleIconContainer: {
+    marginRight: 10,
   },
   socialIcon: {
     marginRight: 10,
   },
   socialButtonText: {
     fontSize: 16,
-    color: '#333',
-  },
-  googleIconContainer: {
-    marginRight: 10,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#444',
+    fontWeight: '500',
   },
 }); 
