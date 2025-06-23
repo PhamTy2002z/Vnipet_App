@@ -17,7 +17,7 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  
+   
   const [showSplash, setShowSplash] = useState(true);
 
   const onLayoutRootView = useCallback(async () => {
@@ -39,12 +39,16 @@ export default function RootLayout() {
   }
 
   if (showSplash) {
-    return <CustomSplashScreen onFinish={() => setShowSplash(false)} />;
+    return <CustomSplashScreen onFinish={() => {
+      setShowSplash(false);
+    }} />;
   }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
