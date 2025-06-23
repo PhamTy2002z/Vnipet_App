@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always answer by Vietnamese.
+The current client interface will be the flutter mobile app and just forcus on IOS platform first, only the admin will manage on the website
+Important: try to fix things at the cause, not the symptom.
+Be very detailed with summarization and do not miss out things that are important.
+After each code update, addition, modification, or refactor, you must carefully debug to avoid breaking, missing, or causing malfunction of other features, UI elements, or components.
