@@ -24,6 +24,37 @@ const apiClient = axios.create({
 });
 
 /**
+ * Tải thông tin dashboard người dùng sau khi đăng nhập
+ * @returns {Promise} - Kết quả từ API
+ */
+const fetchUserDashboard = async () => {
+  try {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    if (!token) {
+      throw new Error('Token không tồn tại');
+    }
+    
+    const response = await apiClient.get('/user/dashboard', {
+      headers: {
+        ...DEFAULT_HEADERS,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (response.data && response.data.success && response.data.data?.user) {
+      const userData = response.data.data.user;
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+      return userData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Fetch user dashboard error:', error);
+    return null;
+  }
+};
+
+/**
  * Đăng nhập 
  * @param {string} email - Email người dùng
  * @param {string} password - Mật khẩu người dùng
@@ -63,6 +94,9 @@ export const login = async (email, password) => {
       
       // Cấu hình header cho các request tiếp theo
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+      
+      // Tải thông tin dashboard để có thêm chi tiết về người dùng
+      await fetchUserDashboard();
     }
     
     return response.data;
@@ -117,6 +151,9 @@ export const register = async (userData) => {
       
       // Cấu hình header cho các request tiếp theo
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+      
+      // Tải thông tin dashboard để có thêm chi tiết về người dùng
+      await fetchUserDashboard();
     }
     
     return response.data;

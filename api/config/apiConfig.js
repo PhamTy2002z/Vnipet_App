@@ -15,7 +15,20 @@ const ENDPOINTS = {
     REFRESH_TOKEN: '/auth/refresh-token',
     LOGOUT: '/auth/logout',
   },
-  // Các endpoints khác sẽ được thêm sau
+  USER: {
+    DASHBOARD: '/account/dashboard',
+    ACTIVITY: '/user/activity',
+    PROFILE: '/user/profile',
+  },
+  PET: {
+    GET_PETS: '/user/pets',
+    PET_DETAILS: '/user/pets/:petId',
+  },
+  THEME: {
+    GET_THEMES: '/user/themes',
+    PURCHASE_THEME: '/user/themes/:themeId/purchase',
+    APPLY_THEME: '/user/themes/:themeId/apply',
+  }
 };
 
 // Cấu hình request
