@@ -426,9 +426,9 @@ export default function PetScreen() {
       }
       
       console.log('Đang gọi API lấy danh sách thú cưng...');
-      console.log('API URL:', `${API_BASE_URL}/pet-owner/pets`);
+      console.log('API URL:', `${API_BASE_URL}/pet-owner/optimized-pets`);
       
-      const response = await fetch(`${API_BASE_URL}/pet-owner/pets`, {
+      const response = await fetch(`${API_BASE_URL}/pet-owner/optimized-pets`, {
         method: 'GET',
         headers: {
           ...API_HEADERS,
@@ -439,11 +439,33 @@ export default function PetScreen() {
       const data = await response.json();
       console.log('Kết quả API thú cưng:', data);
       
+      // In chi tiết một pet để xem cấu trúc
+      if (data.data && data.data.length > 0) {
+        console.log('Cấu trúc dữ liệu pet đầu tiên:', JSON.stringify(data.data[0], null, 2));
+      } else if (data.pets && data.pets.length > 0) {
+        console.log('Cấu trúc dữ liệu pet đầu tiên:', JSON.stringify(data.pets[0], null, 2));
+      }
+      
       if (!response.ok) {
         throw new Error(data.message || 'Có lỗi xảy ra khi lấy danh sách thú cưng');
       }
       
-      const userPetsData = data.data || data.pets || [];
+      // API mới có thể có cấu trúc dữ liệu khác, xử lý phù hợp
+      let userPetsData = [];
+      if (Array.isArray(data)) {
+        // Nếu API trả về trực tiếp là array
+        userPetsData = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        // Nếu API trả về trong data.data
+        userPetsData = data.data;
+      } else if (data.pets && Array.isArray(data.pets)) {
+        // Nếu API trả về trong data.pets
+        userPetsData = data.pets;
+      } else {
+        console.warn('Không tìm thấy dữ liệu thú cưng trong API response');
+      }
+      
+      console.log(`Tìm thấy ${userPetsData.length} thú cưng`);
       setUserPets(userPetsData);
       
       // Nếu có thú cưng và không có petId từ URL, tự động chọn thú cưng đầu tiên
@@ -488,34 +510,44 @@ export default function PetScreen() {
         throw new Error(data.message || 'Có lỗi xảy ra khi lấy thông tin thú cưng');
       }
       
+      // In ra toàn bộ cấu trúc API để debug
+      console.log('Cấu trúc chi tiết của API response:', JSON.stringify(data, null, 2));
+      
       // Chuyển đổi dữ liệu từ API để phù hợp với định dạng hiện tại
       const petData: PetData = {
-        id: data._id,
-        name: data.info?.name || "Không có tên",
-        species: data.info?.species || "Chưa cập nhật",
-        birthDate: data.info?.birthDate ? new Date(data.info.birthDate) : null,
-        description: data.info?.description || "",
+        id: data._id || data.id,
+        name: data.info?.name || data.name || "Không có tên",
+        species: data.info?.species || data.species || "Chưa cập nhật",
+        birthDate: data.info?.birthDate ? new Date(data.info.birthDate) : 
+                  data.birthDate ? new Date(data.birthDate) : null,
+        description: data.info?.description || data.description || "",
         preferences: data.preferences || {
           favoriteFoods: [],
           favoriteShampoo: "",
           dailyRoutine: ""
         },
-        vaccinationHistory: data.vaccinations?.map((vac: any) => ({
-          id: vac._id,
-          name: vac.name,
-          date: new Date(vac.date)
-        })) || [],
-        checkupSchedule: data.reExaminations?.map((exam: any) => ({
-          id: exam._id,
-          note: exam.note,
-          date: new Date(exam.date)
-        })) || [],
-        allergies: data.allergicInfo?.substances?.map((substance: string, index: number) => ({
-          id: index.toString(),
-          name: substance,
-          notes: ""
-        })) || [],
-        avatarUrl: data.avatarUrl || data.avatar?.publicUrl || null
+        vaccinationHistory: Array.isArray(data.vaccinations) 
+          ? data.vaccinations.map((vac: any) => ({
+              id: vac._id || vac.id || String(Math.random()),
+              name: vac.name || "",
+              date: new Date(vac.date || Date.now())
+            }))
+          : [],
+        checkupSchedule: Array.isArray(data.reExaminations)
+          ? data.reExaminations.map((exam: any) => ({
+              id: exam._id || exam.id || String(Math.random()),
+              note: exam.note || "",
+              date: new Date(exam.date || Date.now())
+            }))
+          : [],
+        allergies: Array.isArray(data.allergicInfo?.substances)
+          ? data.allergicInfo.substances.map((substance: string, index: number) => ({
+              id: index.toString(),
+              name: substance || "",
+              notes: data.allergicInfo?.note || ""
+            }))
+          : [],
+        avatarUrl: data.avatarUrl || data.avatar?.publicUrl || data.petImage || null
       };
       
       return petData;
@@ -531,14 +563,67 @@ export default function PetScreen() {
   // Xử lý khi chọn pet từ danh sách
   const handleSelectPet = async (selectedPet: any) => {
     try {
-      const petDetails = await fetchPetDetails(selectedPet._id);
-      if (petDetails) {
-        setCurrentPetData(petDetails);
+      // Xác định ID của thú cưng từ dữ liệu trả về (API mới có thể khác cấu trúc)
+      const petId = selectedPet._id || selectedPet.id;
+      
+      if (!petId) {
+        console.error('Không tìm thấy ID thú cưng:', selectedPet);
+        Alert.alert('Lỗi', 'Không thể xác định thông tin thú cưng. Vui lòng thử lại sau.');
+        return;
+      }
+      
+      console.log(`Chọn thú cưng với ID: ${petId}`);
+      
+      // Đóng modal trước để tạo trải nghiệm mượt mà hơn
+      setIsPetSelectorVisible(false);
+      setIsLoadingCurrentPet(true);
+      
+      // Tạo dữ liệu dự phòng từ selectedPet để đề phòng API chi tiết thất bại
+      const fallbackPetData: PetData = {
+        id: petId,
+        name: selectedPet.info?.name || selectedPet.name || "Không có tên",
+        species: selectedPet.info?.species || selectedPet.species || "Chưa cập nhật",
+        birthDate: null,
+        description: selectedPet.info?.description || selectedPet.description || "",
+        preferences: {
+          favoriteFoods: [],
+          favoriteShampoo: "",
+          dailyRoutine: ""
+        },
+        vaccinationHistory: [],
+        checkupSchedule: [],
+        allergies: [],
+        avatarUrl: selectedPet.avatarUrl || selectedPet.avatar?.publicUrl || selectedPet.petImage || null
+      };
+      
+      try {
+        const petDetails = await fetchPetDetails(petId);
+        if (petDetails) {
+          setCurrentPetData(petDetails);
+          console.log('Đã chuyển sang thú cưng mới thành công với đầy đủ dữ liệu');
+        } else {
+          // Nếu không lấy được chi tiết, sử dụng dữ liệu dự phòng
+          console.log('Sử dụng dữ liệu dự phòng khi không lấy được chi tiết');
+          setCurrentPetData(fallbackPetData);
+          Alert.alert(
+            'Thông báo',
+            'Đã chuyển thú cưng nhưng có thể thiếu một số thông tin chi tiết.'
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi tải chi tiết thú cưng, sử dụng dữ liệu dự phòng:', error);
+        // Khi có lỗi, vẫn chuyển sang thú cưng mới nhưng với dữ liệu tối thiểu
+        setCurrentPetData(fallbackPetData);
+        Alert.alert(
+          'Thông báo',
+          'Đã chuyển thú cưng nhưng có thể thiếu một số thông tin chi tiết.'
+        );
       }
     } catch (error) {
       console.error('Lỗi khi chọn thú cưng:', error);
+      Alert.alert('Lỗi', 'Không thể chuyển sang thú cưng này. Vui lòng thử lại sau.');
     } finally {
-      setIsPetSelectorVisible(false);
+      setIsLoadingCurrentPet(false);
     }
   };
 
@@ -736,12 +821,20 @@ export default function PetScreen() {
 
   // Fetch danh sách thú cưng khi mở modal
   const handleOpenPetSelector = async () => {
-    // Debug token
-    const token = await getAuthToken();
-    console.log('Token hiện tại:', token ? 'Có token' : 'Không có token');
-    
-    fetchUserPets();
+    // Hiển thị modal trước để có trải nghiệm UI mượt mà
     setIsPetSelectorVisible(true);
+    
+    // Sau đó mới tải danh sách thú cưng
+    try {
+      // Debug token
+      const token = await getAuthToken();
+      console.log('Token hiện tại:', token ? 'Có token' : 'Không có token');
+      
+      // Tải danh sách thú cưng mới
+      fetchUserPets();
+    } catch (error) {
+      console.error('Lỗi khi mở pet selector:', error);
+    }
   };
   
   // Tải dữ liệu khi component được mount hoặc có petId từ URL
@@ -883,7 +976,16 @@ export default function PetScreen() {
                 <View style={styles.bottomSheetHandle}></View>
                 
                 <View style={styles.bottomSheetHeader}>
-                  <Text style={styles.bottomSheetTitle}>Chọn thú cưng</Text>
+                  <Text style={styles.bottomSheetTitle}>Danh sách thú cưng</Text>
+                  <TouchableOpacity 
+                    style={styles.refreshButton}
+                    onPress={() => {
+                      console.log('Đang làm mới danh sách thú cưng');
+                      fetchUserPets();
+                    }}
+                  >
+                    <Ionicons name="refresh" size={20} color="#595085" />
+                  </TouchableOpacity>
                   <TouchableOpacity 
                     style={styles.closeButton}
                     onPress={() => setIsPetSelectorVisible(false)}
@@ -891,7 +993,7 @@ export default function PetScreen() {
                     <AntDesign name="close" size={22} color="#999" />
                   </TouchableOpacity>
                 </View>
-                
+
                 <ScrollView style={styles.petsScrollView}>
                   {isLoadingPets ? (
                     <View style={styles.loadingContainer}>
@@ -914,42 +1016,51 @@ export default function PetScreen() {
                       <Text style={styles.emptyText}>Bạn chưa có thú cưng nào</Text>
                     </View>
                   ) : (
-                    userPets.map((pet) => (
-                      <TouchableOpacity
-                        key={pet._id}
-                        style={[
-                          styles.petSelectorItem,
-                          pet._id === currentPetData.id ? styles.activePetItem : {}
-                        ]}
-                        onPress={() => handleSelectPet(pet)}
-                      >
-                        <View style={styles.petAvatarContainer}>
-                          <Image 
-                            source={pet.avatarUrl || pet.avatar?.publicUrl 
-                              ? { uri: pet.avatarUrl || pet.avatar?.publicUrl } 
-                              : { uri: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=162&auto=format&fit=crop' }}
-                            style={styles.petAvatarImage}
-                            resizeMode="cover"
-                          />
-                          {pet._id === currentPetData.id && (
-                            <View style={styles.activeCheckIcon}>
-                              <MaterialIcons name="check-circle" size={18} color="#FFF" />
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.petSelectorDetails}>
-                          <Text style={styles.petSelectorName}>{pet.info?.name || "Không có tên"}</Text>
-                          <Text style={styles.petSelectorType}>{pet.info?.species || "Chưa cập nhật"}</Text>
-                        </View>
-                        <View style={styles.petSelectorArrow}>
-                          <AntDesign 
-                            name="right" 
-                            size={16} 
-                            color={pet._id === currentPetData.id ? accentColor : "#CCCCCC"} 
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    ))
+                    userPets.map((pet, index) => {
+                      // Xác định ID của thú cưng
+                      const petId = pet._id || pet.id;
+                      // Log để debug
+                      console.log(`Pet #${index}: ID=${petId}, Name=${pet.info?.name || pet.name || 'N/A'}`);
+                      // Kiểm tra pet này có phải là thú cưng đang được chọn không
+                      const isSelected = petId === currentPetData.id;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={petId || index}
+                          style={[
+                            styles.petSelectorItem,
+                            isSelected ? styles.activePetItem : {}
+                          ]}
+                          onPress={() => handleSelectPet(pet)}
+                        >
+                          <View style={styles.petAvatarContainer}>
+                            <Image 
+                              source={pet.avatarUrl || pet.avatar?.publicUrl || pet.petImage
+                                ? { uri: pet.avatarUrl || pet.avatar?.publicUrl || pet.petImage } 
+                                : { uri: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=162&auto=format&fit=crop' }}
+                              style={styles.petAvatarImage}
+                              resizeMode="cover"
+                            />
+                            {isSelected && (
+                              <View style={styles.activeCheckIcon}>
+                                <MaterialIcons name="check-circle" size={18} color="#FFF" />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.petSelectorDetails}>
+                            <Text style={styles.petSelectorName}>{pet.info?.name || pet.name || "Không có tên"}</Text>
+                            <Text style={styles.petSelectorType}>{pet.info?.species || pet.species || "Chưa cập nhật"}</Text>
+                          </View>
+                          <View style={styles.petSelectorArrow}>
+                            <AntDesign 
+                              name="right" 
+                              size={16} 
+                              color={isSelected ? accentColor : "#CCCCCC"} 
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
                   )}
                 </ScrollView>
               </View>
@@ -1028,7 +1139,9 @@ const styles = StyleSheet.create({
   menuButton: {
     position: 'absolute',
     right: 20,
-    padding: 5,
+    padding: 8,
+    backgroundColor: 'rgba(89, 80, 133, 0.1)',
+    borderRadius: 20,
   },
   scrollContent: {
     padding: 20,
@@ -1166,7 +1279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
@@ -1174,9 +1287,14 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.SFProDisplay.bold,
     fontSize: 18,
     color: '#333333',
+    flex: 1,
   },
   closeButton: {
     padding: 5,
+  },
+  refreshButton: {
+    padding: 5,
+    marginRight: 10,
   },
   petsScrollView: {
     maxHeight: '70%',
@@ -1200,6 +1318,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: '#F5F5F5',
   },
   activeCheckIcon: {
     position: 'absolute',
@@ -1271,5 +1390,5 @@ const styles = StyleSheet.create({
     color: '#999999',
     textAlign: 'center',
     marginTop: 10,
-  }
+  },
 }); 
