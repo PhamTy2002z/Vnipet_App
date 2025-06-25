@@ -10,10 +10,11 @@ import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AntDesign, Entypo, Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, InteractionManager, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 
 // Định nghĩa interface cho dữ liệu Pet
 interface PetData {
@@ -338,6 +339,9 @@ export default function PetScreen() {
   const textColor = isDark ? Colors.dark.text : Colors.light.text;
   const subTextColor = isDark ? Colors.dark.icon : Colors.light.icon;
   const accentColor = '#595085';
+  
+  // Sử dụng hook để xử lý quyền truy cập thư viện ảnh
+  const [mediaLibraryPermission, requestMediaLibraryPermissionFn] = ImagePicker.useMediaLibraryPermissions();
   
   // Lấy tham số từ URL
   const params = useLocalSearchParams();
@@ -753,6 +757,239 @@ export default function PetScreen() {
     }
   };
 
+  // State cho avatar options modal
+  const [isAvatarOptionsVisible, setAvatarOptionsVisible] = useState(false);
+  const [isAvatarHovered, setAvatarHovered] = useState(false);
+
+  // Hàm để chọn ảnh từ thư viện
+  const pickImage = async () => {
+    console.log('Bắt đầu quá trình chọn ảnh...');
+    
+    // Đóng modal trước
+    setAvatarOptionsVisible(false);
+    
+    // Đợi animation của modal hoàn tất để tránh xung đột UI (đặc biệt trên iOS)
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        // Kiểm tra quyền trước
+        if (!mediaLibraryPermission?.granted) {
+          console.log('Chưa có quyền, yêu cầu quyền truy cập thư viện ảnh...');
+          const permissionResult = await requestMediaLibraryPermissionFn();
+          console.log('Kết quả yêu cầu quyền:', permissionResult);
+          
+          if (!permissionResult.granted) {
+            console.log('Quyền bị từ chối sau khi yêu cầu');
+            Alert.alert(
+              'Cần quyền truy cập',
+              'Ứng dụng cần quyền truy cập thư viện ảnh để chọn avatar. Vui lòng cấp quyền trong Cài đặt.',
+              [{ text: 'Đã hiểu' }]
+            );
+            return;
+          }
+        } else {
+          console.log('Đã có quyền truy cập thư viện ảnh');
+        }
+        
+        console.log('Mở thư viện ảnh...');
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+          legacy: true
+        });
+        
+        console.log('Kết quả chọn ảnh:', result);
+        
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const selectedAsset = result.assets[0];
+          console.log('Ảnh đã chọn:', selectedAsset.uri);
+          uploadAvatar(selectedAsset.uri);
+        } else {
+          console.log('Người dùng đã hủy chọn ảnh');
+        }
+      } catch (error) {
+        console.error('Lỗi khi chọn ảnh:', error);
+        Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+      }
+    });
+  };
+
+  // Hàm để upload avatar
+  const uploadAvatar = async (imageUri: string) => {
+    try {
+      setIsLoadingCurrentPet(true);
+      
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Không tìm thấy token đăng nhập');
+      }
+      
+      // Tạo FormData
+      const formData = new FormData();
+      
+      // Lấy tên file từ URI
+      const fileName = imageUri.split('/').pop() || `pet_avatar_${Date.now()}.jpg`;
+      
+      // Kiểm tra kiểu MIME
+      const mimeType = imageUri.match(/\.(\w+)$/i)?.[1].toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      
+      // Thêm file vào form data
+      formData.append('avatar', {
+        uri: imageUri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+      
+      console.log('Đang upload avatar...');
+      console.log('API URL:', `${API_BASE_URL}/pet-owner/pets/${currentPetData.id}/avatar`);
+      
+      const response = await fetch(`${API_BASE_URL}/pet-owner/pets/${currentPetData.id}/avatar`, {
+        method: 'POST',
+        headers: {
+          ...API_HEADERS,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+      
+      const data = await response.json();
+      console.log('Kết quả upload avatar:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Không thể upload avatar');
+      }
+      
+      const newAvatarUrl = data.avatar?.publicUrl || data.avatarUrl;
+      
+      // Cập nhật avatar URL trong state
+      setCurrentPetData(prev => ({
+        ...prev,
+        avatarUrl: newAvatarUrl,
+      }));
+      
+      // Cập nhật danh sách thú cưng trong userPets
+      const updatedPets = userPets.map(pet => {
+        if (pet._id === currentPetData.id || pet.id === currentPetData.id) {
+          return {
+            ...pet,
+            avatarUrl: newAvatarUrl,
+            avatar: {
+              ...pet.avatar,
+              publicUrl: newAvatarUrl
+            }
+          };
+        }
+        return pet;
+      });
+      setUserPets(updatedPets);
+      
+      // Cập nhật trong UserContext để đồng bộ với các màn hình khác
+      if (updatePets) {
+        updatePets(updatedPets);
+      }
+      
+      Alert.alert('Thành công', 'Đã cập nhật avatar thú cưng thành công');
+      
+    } catch (error: any) {
+      console.error('Lỗi khi upload avatar:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể upload avatar. Vui lòng thử lại.');
+    } finally {
+      setIsLoadingCurrentPet(false);
+    }
+  };
+
+  // Hàm để xóa avatar
+  const deleteAvatar = async () => {
+    // Đóng modal trước
+    setAvatarOptionsVisible(false);
+    
+    // Xác nhận trước khi xóa
+    Alert.alert(
+      'Xác nhận xóa',
+      'Bạn có chắc chắn muốn xóa avatar của thú cưng?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoadingCurrentPet(true);
+              
+              const token = await getAuthToken();
+              if (!token) {
+                throw new Error('Không tìm thấy token đăng nhập');
+              }
+              
+              console.log('Đang xóa avatar...');
+              console.log('API URL:', `${API_BASE_URL}/pet-owner/pets/${currentPetData.id}/avatar`);
+              
+              const response = await fetch(`${API_BASE_URL}/pet-owner/pets/${currentPetData.id}/avatar`, {
+                method: 'DELETE',
+                headers: {
+                  ...API_HEADERS,
+                  'Authorization': `Bearer ${token}`,
+                },
+              });
+              
+              const data = await response.json();
+              console.log('Kết quả xóa avatar:', data);
+              
+              if (!response.ok) {
+                throw new Error(data.message || data.error || 'Không thể xóa avatar');
+              }
+              
+              // Cập nhật avatar URL trong state
+              setCurrentPetData(prev => ({
+                ...prev,
+                avatarUrl: null,
+              }));
+              
+              // Cập nhật danh sách thú cưng trong userPets
+              const updatedPets = userPets.map(pet => {
+                if (pet._id === currentPetData.id || pet.id === currentPetData.id) {
+                  return {
+                    ...pet,
+                    avatarUrl: null,
+                    avatar: {
+                      ...pet.avatar,
+                      publicUrl: null
+                    }
+                  };
+                }
+                return pet;
+              });
+              setUserPets(updatedPets);
+              
+              // Cập nhật trong UserContext để đồng bộ với các màn hình khác
+              if (updatePets) {
+                updatePets(updatedPets);
+              }
+              
+              Alert.alert('Thành công', 'Đã xóa avatar thú cưng thành công');
+              
+            } catch (error: any) {
+              console.error('Lỗi khi xóa avatar:', error);
+              Alert.alert('Lỗi', error.message || 'Không thể xóa avatar. Vui lòng thử lại.');
+            } finally {
+              setIsLoadingCurrentPet(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Hiển thị modal tùy chọn avatar
+  const showAvatarOptions = () => {
+    setAvatarOptionsVisible(true);
+  };
+
   // Lọc đặc điểm theo danh mục
   // Lấy dữ liệu từ thú cưng hiện tại thay vì dữ liệu mẫu
   const formatCheckupDate = (date: Date): string => {
@@ -888,11 +1125,28 @@ export default function PetScreen() {
         <View style={styles.profileSection}>
           {/* Avatar và Thông tin */}
           <View style={styles.avatarContainer}>
-            <Image 
-              source={currentPetData.avatarUrl ? { uri: currentPetData.avatarUrl } : { uri: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=162&auto=format&fit=crop' }} 
-              style={styles.avatar} 
-              resizeMode="cover"
-            />
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              style={styles.avatarTouchable}
+              onPress={showAvatarOptions}
+              onPressIn={() => setAvatarHovered(true)}
+              onPressOut={() => setAvatarHovered(false)}
+            >
+              <Image 
+                source={currentPetData.avatarUrl 
+                  ? { uri: currentPetData.avatarUrl } 
+                  : { uri: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=162&auto=format&fit=crop' }} 
+                style={styles.avatar} 
+                resizeMode="cover"
+              />
+              <View style={[
+                styles.editAvatarOverlay,
+                isAvatarHovered && styles.editAvatarOverlayVisible
+              ]}>
+                <Feather name="camera" size={28} color="#FFFFFF" />
+                <Text style={styles.editAvatarText}>Chỉnh sửa</Text>
+              </View>
+            </TouchableOpacity>
             <View style={styles.petTypeTag}>
               <Feather name="tag" size={16} color="#FFFFFF" />
             </View>
@@ -1104,6 +1358,54 @@ export default function PetScreen() {
         petData={currentPetData}
         onSave={handleSaveAllergies}
       />
+
+      {/* Avatar Options Modal */}
+      <Modal
+        visible={isAvatarOptionsVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAvatarOptionsVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAvatarOptionsVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.bottomSheetContent}>
+                <View style={styles.bottomSheetHandle}></View>
+                
+                <View style={styles.bottomSheetHeader}>
+                  <Text style={styles.bottomSheetTitle}>Ảnh đại diện thú cưng</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => setAvatarOptionsVisible(false)}
+                  >
+                    <AntDesign name="close" size={22} color="#999" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.avatarOptionsContainer}>
+                  <TouchableOpacity 
+                    style={styles.avatarOptionButton}
+                    onPress={pickImage}
+                  >
+                    <Ionicons name="image-outline" size={24} color="#595085" style={styles.avatarOptionIcon} />
+                    <Text style={styles.avatarOptionText}>Chọn từ thư viện</Text>
+                  </TouchableOpacity>
+
+                  {currentPetData.avatarUrl && (
+                    <TouchableOpacity 
+                      style={[styles.avatarOptionButton, styles.deleteAvatarButton]}
+                      onPress={deleteAvatar}
+                    >
+                      <Ionicons name="trash-outline" size={24} color="#FF3B30" style={styles.avatarOptionIcon} />
+                      <Text style={[styles.avatarOptionText, styles.deleteAvatarText]}>Xóa ảnh hiện tại</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1155,10 +1457,34 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginRight: 20,
   },
+  avatarTouchable: {
+    position: 'relative',
+  },
   avatar: {
     width: 120,
     height: 120,
     borderRadius: 60,
+  },
+  editAvatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0,
+  },
+  editAvatarOverlayVisible: {
+    opacity: 1,
+  },
+  editAvatarText: {
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginTop: 5,
   },
   petTypeTag: {
     position: 'absolute',
@@ -1390,5 +1716,35 @@ const styles = StyleSheet.create({
     color: '#999999',
     textAlign: 'center',
     marginTop: 10,
+  },
+  avatarOptionsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    gap: 20,
+  },
+  avatarOptionButton: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'center',
+  },
+  avatarOptionIcon: {
+    marginRight: 10,
+  },
+  avatarOptionText: {
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 16,
+    color: '#333333',
+  },
+  deleteAvatarButton: {
+    borderColor: '#FFDDDD',
+    backgroundColor: '#FFF5F5',
+  },
+  deleteAvatarText: {
+    color: '#FF3B30',
   },
 }); 
