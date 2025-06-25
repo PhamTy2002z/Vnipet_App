@@ -371,7 +371,7 @@ export const getAccessToken = async () => {
  */
 const scanAndLinkQR = async (qrToken) => {
   try {
-    const response = await apiClient.post('/user/pets/scan-qr', { qrToken });
+    const response = await apiClient.post('/account/scan-qr', { qrToken });
     return response.data;
   } catch (error) {
     console.error('Scan QR error:', error);

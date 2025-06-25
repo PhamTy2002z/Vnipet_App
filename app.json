@@ -9,14 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Vnipet-App"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/splash-screen/Logo.png",
         "backgroundColor": "#1CE6DA"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.anonymous.Vnipet_App"
     },
     "web": {
       "bundler": "metro",

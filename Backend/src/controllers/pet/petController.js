@@ -94,8 +94,8 @@ exports.scanAndLinkQR = async (req, res) => {
       qrToken,
       petId: pet._id,
       scannedBy: userId,
-      action: 'link_pet',
-      success: true,
+      action: 'link',
+      actionSuccess: true,
     });
     await scan.save();
 

@@ -6,6 +6,7 @@ import PreferencesModal from '@/components/modals/PreferencesModal';
 import VaccinationHistoryModal from '@/components/modals/VaccinationHistoryModal';
 import { Colors } from '@/constants/Colors';
 import { Fonts } from '@/constants/Fonts';
+import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AntDesign, Entypo, Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -399,6 +400,8 @@ export default function PetScreen() {
     avatarUrl: null
   });
 
+  const { pets: userContextPets, updatePets } = useUser();
+
   // Hàm để lấy token từ AsyncStorage
   const getAuthToken = async () => {
     try {
@@ -549,6 +552,32 @@ export default function PetScreen() {
       
       // Cập nhật state sau khi lưu thành công
       setCurrentPetData({...currentPetData, ...data});
+      
+      // Cập nhật danh sách thú cưng trong state
+      const updatedPets = userPets.map(pet => {
+        if (pet._id === currentPetData.id) {
+          return {
+            ...pet,
+            info: {
+              ...pet.info,
+              name: data.name || pet.info?.name,
+              species: data.species || pet.info?.species,
+              description: data.description || pet.info?.description,
+              birthDate: data.birthDate || pet.info?.birthDate
+            }
+          };
+        }
+        return pet;
+      });
+      
+      // Cập nhật state local
+      setUserPets(updatedPets);
+      
+      // Cập nhật user context để đồng bộ trên toàn ứng dụng
+      updatePets(updatedPets);
+      
+      // Tải lại danh sách thú cưng
+      fetchUserPets();
       
       Alert.alert('Thành công', 'Đã cập nhật thông tin cơ bản thành công');
     } catch (error: any) {
@@ -840,7 +869,7 @@ export default function PetScreen() {
         </View>
       </ScrollView>
 
-      {/* Pet Selector Modal */}
+      {/* Pet Selector Bottom Sheet */}
       <Modal
         visible={isPetSelectorVisible}
         transparent={true}
@@ -850,11 +879,20 @@ export default function PetScreen() {
         <TouchableWithoutFeedback onPress={() => setIsPetSelectorVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Thú cưng của bạn</Text>
+              <View style={styles.bottomSheetContent}>
+                <View style={styles.bottomSheetHandle}></View>
+                
+                <View style={styles.bottomSheetHeader}>
+                  <Text style={styles.bottomSheetTitle}>Chọn thú cưng</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => setIsPetSelectorVisible(false)}
+                  >
+                    <AntDesign name="close" size={22} color="#999" />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.modalBody}>
+                
+                <ScrollView style={styles.petsScrollView}>
                   {isLoadingPets ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator size="large" color={accentColor} />
@@ -872,30 +910,48 @@ export default function PetScreen() {
                     </View>
                   ) : userPets.length === 0 ? (
                     <View style={styles.emptyContainer}>
+                      <MaterialIcons name="pets" size={48} color="#CCCCCC" />
                       <Text style={styles.emptyText}>Bạn chưa có thú cưng nào</Text>
                     </View>
                   ) : (
                     userPets.map((pet) => (
                       <TouchableOpacity
                         key={pet._id}
-                        style={styles.petItem}
+                        style={[
+                          styles.petSelectorItem,
+                          pet._id === currentPetData.id ? styles.activePetItem : {}
+                        ]}
                         onPress={() => handleSelectPet(pet)}
                       >
-                        <View style={styles.petItemIcon}>
-                          <MaterialIcons 
-                            name={pet._id === currentPetData.id ? "radio-button-checked" : "radio-button-unchecked"} 
-                            size={24} 
-                            color={pet._id === currentPetData.id ? accentColor : "#999"} 
+                        <View style={styles.petAvatarContainer}>
+                          <Image 
+                            source={pet.avatarUrl || pet.avatar?.publicUrl 
+                              ? { uri: pet.avatarUrl || pet.avatar?.publicUrl } 
+                              : { uri: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=162&auto=format&fit=crop' }}
+                            style={styles.petAvatarImage}
+                            resizeMode="cover"
                           />
+                          {pet._id === currentPetData.id && (
+                            <View style={styles.activeCheckIcon}>
+                              <MaterialIcons name="check-circle" size={18} color="#FFF" />
+                            </View>
+                          )}
                         </View>
-                        <View style={styles.petItemContent}>
-                          <Text style={styles.petItemName}>{pet.info?.name || "Không có tên"}</Text>
-                          <Text style={styles.petItemSpecies}>{pet.info?.species || "Chưa cập nhật"}</Text>
+                        <View style={styles.petSelectorDetails}>
+                          <Text style={styles.petSelectorName}>{pet.info?.name || "Không có tên"}</Text>
+                          <Text style={styles.petSelectorType}>{pet.info?.species || "Chưa cập nhật"}</Text>
+                        </View>
+                        <View style={styles.petSelectorArrow}>
+                          <AntDesign 
+                            name="right" 
+                            size={16} 
+                            color={pet._id === currentPetData.id ? accentColor : "#CCCCCC"} 
+                          />
                         </View>
                       </TouchableOpacity>
                     ))
                   )}
-                </View>
+                </ScrollView>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -1089,56 +1145,91 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  bottomSheetContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 16,
-    paddingBottom: 30,
-    maxHeight: '50%',
+    paddingTop: 10,
+    paddingBottom: 40,
+    maxHeight: '80%',
   },
-  modalHeader: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-    paddingBottom: 16,
+  bottomSheetHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2.5,
+    alignSelf: 'center',
     marginBottom: 10,
-    alignItems: 'center',
   },
-  modalTitle: {
+  bottomSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  bottomSheetTitle: {
     fontFamily: Fonts.SFProDisplay.bold,
     fontSize: 18,
     color: '#333333',
   },
-  modalBody: {
-    paddingHorizontal: 20,
+  closeButton: {
+    padding: 5,
   },
-  petItem: {
+  petsScrollView: {
+    maxHeight: '70%',
+  },
+  petSelectorItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#F0F0F0',
   },
-  petItemIcon: {
+  activePetItem: {
+    backgroundColor: 'rgba(89, 80, 133, 0.05)',
+  },
+  petAvatarContainer: {
+    position: 'relative',
     marginRight: 15,
   },
-  petItemContent: {
+  petAvatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  activeCheckIcon: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#595085',
+    borderRadius: 10,
+    padding: 2,
+  },
+  petSelectorDetails: {
     flex: 1,
   },
-  petItemName: {
-    fontFamily: Fonts.SFProText.medium,
+  petSelectorName: {
+    fontFamily: Fonts.SFProText.semibold,
     fontSize: 16,
     color: '#333333',
-    marginBottom: 2,
+    marginBottom: 3,
   },
-  petItemSpecies: {
+  petSelectorType: {
     fontFamily: Fonts.SFProText.regular,
     fontSize: 14,
     color: '#666666',
   },
+  petSelectorArrow: {
+    paddingHorizontal: 5,
+  },
+  
   // Loading styles
   loadingContainer: {
-    padding: 20,
+    padding: 30,
     alignItems: 'center',
   },
   loadingText: {
@@ -1146,9 +1237,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#333333',
   },
+  
   // Error styles
   errorContainer: {
-    padding: 20,
+    padding: 30,
     alignItems: 'center',
   },
   errorText: {
@@ -1167,9 +1259,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: Fonts.SFProText.medium,
   },
+  
   // Empty state
   emptyContainer: {
-    padding: 30,
+    padding: 40,
     alignItems: 'center',
   },
   emptyText: {
@@ -1177,5 +1270,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999999',
     textAlign: 'center',
+    marginTop: 10,
   }
 }); 

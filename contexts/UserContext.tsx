@@ -65,6 +65,7 @@ interface UserContextProps {
   loadUserData: () => Promise<void>;
   clearUserData: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => void;
+  updatePets: (pets: PetData[]) => void;
 }
 
 // Tạo context
@@ -172,6 +173,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     });
   };
 
+  // Cập nhật danh sách pets từ bên ngoài
+  const updatePets = (updatedPets: PetData[]) => {
+    setPets(updatedPets);
+    
+    // Cập nhật trong dashboardData nếu có
+    if (dashboardData) {
+      setDashboardData({
+        ...dashboardData,
+        pets: updatedPets
+      });
+    }
+  };
+
   // Khởi tạo: kiểm tra xem đã có dữ liệu người dùng trong AsyncStorage chưa
   useEffect(() => {
     const initializeUser = async () => {
@@ -216,6 +230,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     loadUserData,
     clearUserData,
     updateUserData,
+    updatePets,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
