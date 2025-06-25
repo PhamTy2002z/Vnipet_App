@@ -8,7 +8,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 type IconName = 'home' | 'home-outline' | 'cart' | 'cart-outline' | 'scan' | 
-               'paw' | 'paw-outline' | 'person' | 'person-outline';
+               'reader' | 'reader-outline' | 'person' | 'person-outline';
 
 interface NavItem {
   key: string;
@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
   { key: 'home', icon: 'home', label: 'Home', route: '/(tabs)' },
   { key: 'store', icon: 'cart', label: 'Cửa Hàng', route: '/(tabs)/store' },
   { key: 'scan', icon: 'scan', label: 'Scan', route: '/scan', isSpecial: true },
-  { key: 'pet', icon: 'paw', label: 'Pet', route: '/(tabs)/pet' },
+  { key: 'orders', icon: 'reader', label: 'Đơn hàng', route: '/(tabs)/purchasehistory' },
   { key: 'profile', icon: 'person', label: 'Profile', route: '/(tabs)/profile' },
 ];
 

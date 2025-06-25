@@ -137,8 +137,7 @@ export default function HomeScreen() {
       >
         {/* Theme Preview */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>Theme Preview</Text>
+          <View style={[styles.sectionHeader, { justifyContent: 'flex-end' }]}>
             <View style={[
               styles.badge, 
               { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#f1f5f9' }
