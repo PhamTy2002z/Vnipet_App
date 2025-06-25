@@ -69,7 +69,9 @@ export default function SwipeableThemeCards() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: (_, gesture) => {
+        return Math.abs(gesture.dx) > Math.abs(gesture.dy);
+      },
       onPanResponderMove: (_, gesture) => {
         position.setValue({ x: gesture.dx, y: 0 });
       },
