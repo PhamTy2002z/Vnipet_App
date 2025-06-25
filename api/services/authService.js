@@ -20,7 +20,15 @@ const STORAGE_KEYS = {
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT,
-  headers: DEFAULT_HEADERS,
+  headers: {
+    ...DEFAULT_HEADERS,
+    'device-id': 'vnipet-mobile-app',
+    'app-version': '1.0.0',
+    'platform': 'ios',
+    'os-version': '14.0',
+    'device-type': 'mobile',
+    'User-Agent': 'VnipetApp/1.0 iOS/14.0'
+  },
 });
 
 /**
@@ -356,6 +364,25 @@ export const getAccessToken = async () => {
   }
 };
 
+/**
+ * Quét và liên kết QR code với tài khoản người dùng
+ * @param {string} qrToken Mã token từ QR code
+ * @returns {Promise<object>} Kết quả liên kết pet
+ */
+const scanAndLinkQR = async (qrToken) => {
+  try {
+    const response = await apiClient.post('/user/pets/scan-qr', { qrToken });
+    return response.data;
+  } catch (error) {
+    console.error('Scan QR error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Không thể quét mã QR',
+      error: error.response?.data || error.message,
+    };
+  }
+};
+
 // Interceptor để xử lý refresh token tự động
 apiClient.interceptors.response.use(
   (response) => response,
@@ -396,6 +423,7 @@ export const authService = {
   isLoggedIn,
   getCurrentUser,
   getAccessToken,
+  scanAndLinkQR,
   STORAGE_KEYS,
 };
 

@@ -3,8 +3,10 @@
  * Cấu hình API cho Vnipet App
  */
 
-// Lấy URL từ biến môi trường
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.1.5:8000/api/v1';
+// Lấy URL từ biến môi trường và đảm bảo không có ký tự '@'
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL 
+  ? process.env.EXPO_PUBLIC_API_URL.replace('@', '') 
+  : 'http://192.168.1.5:8000/api/v1';
 
 // Các endpoints
 const ENDPOINTS = {
@@ -31,10 +33,19 @@ const ENDPOINTS = {
   }
 };
 
-// Cấu hình request
+// Cấu hình request headers theo yêu cầu của middleware mobileCors
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
   'Accept': 'application/json',
+  'device-id': 'vnipet-mobile-app',
+  'app-version': '1.0.0',
+  'platform': 'ios',
+  'os-version': '14.0',
+  'device-type': 'mobile',
+  'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+  // Thêm các headers theo yêu cầu của mobileCors middleware
+  'x-device-id': 'vnipet-mobile-app',
+  'x-app-version': '1.0.0'
 };
 
 // Cấu hình timeout

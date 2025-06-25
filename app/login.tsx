@@ -1,8 +1,9 @@
 import { AntDesign, Feather, FontAwesome } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { authService } from '../api/services/authService';
 import { getDeviceInfo } from '../api/utils/deviceUtils';
@@ -15,6 +16,34 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    // Kiểm tra xem có thông tin đăng nhập đã lưu hay không
+    const checkSavedLogin = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('@vnipet_saved_email');
+        const savedRememberMe = await AsyncStorage.getItem('@vnipet_remember_me');
+        const token = await AsyncStorage.getItem('@vnipet_access_token');
+        
+        // Nếu đã lưu "Remember me" và có token, tự động đăng nhập
+        if (savedRememberMe === 'true' && token) {
+          console.log('Tự động đăng nhập với token đã lưu');
+          router.replace('/(tabs)');
+          return;
+        }
+        
+        // Nếu có email đã lưu, điền vào form
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(savedRememberMe === 'true');
+        }
+      } catch (error) {
+        console.error('Lỗi khi kiểm tra thông tin đăng nhập đã lưu:', error);
+      }
+    };
+    
+    checkSavedLogin();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -32,6 +61,20 @@ export default function LoginScreen() {
       const result = await authService.login(email, password);
       
       if (result.success) {
+        // Kiểm tra token sau khi đăng nhập
+        const savedToken = await AsyncStorage.getItem('@vnipet_access_token');
+        console.log('Token sau khi đăng nhập:', savedToken ? 'Đã lưu token' : 'Chưa lưu token');
+        
+        // Lưu thông tin "Remember me" nếu được tích chọn
+        if (rememberMe) {
+          await AsyncStorage.setItem('@vnipet_saved_email', email);
+          await AsyncStorage.setItem('@vnipet_remember_me', 'true');
+        } else {
+          // Xóa thông tin đã lưu nếu không chọn "Remember me"
+          await AsyncStorage.removeItem('@vnipet_saved_email');
+          await AsyncStorage.removeItem('@vnipet_remember_me');
+        }
+        
         // Đăng nhập thành công
         console.log('Đăng nhập thành công:', result.user);
         router.replace('/(tabs)');

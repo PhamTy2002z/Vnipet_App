@@ -10,7 +10,16 @@ export interface PetData {
     species: string;
     breed?: string;
   };
-  avatar?: string;
+  avatar?: {
+    publicUrl?: string;
+    r2Key?: string;
+    bucket?: string;
+    originalName?: string;
+    mimetype?: string;
+    size?: number;
+    uploadedAt?: Date;
+  } | string;  // Cho phép cả object phức tạp hoặc string URL trực tiếp
+  petImage?: string; // URL hình ảnh thú cưng
   status: string;
   qrToken?: string;
   themeId?: any;
@@ -99,6 +108,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         
         // Lưu danh sách thú cưng
         if (Array.isArray(response.data.pets)) {
+          console.log('Pet data from API:', JSON.stringify(response.data.pets, null, 2));
           setPets(response.data.pets);
         }
         
@@ -137,6 +147,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       await AsyncStorage.removeItem('@vnipet_access_token');
       await AsyncStorage.removeItem('@vnipet_refresh_token');
       await AsyncStorage.removeItem('@vnipet_user_data');
+      // Xóa thêm thông tin Remember me khi đăng xuất
+      await AsyncStorage.removeItem('@vnipet_remember_me');
       setUser(null);
       setPets([]);
       setDashboardData(null);

@@ -6,6 +6,7 @@ import { Fonts } from '@/constants/Fonts';
 import { useUser } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -79,6 +80,30 @@ export default function HomeScreen() {
     loadUserData();
   }, []);
 
+  // Hàm xử lý khi người dùng chọn một thú cưng
+  const handleSelectPet = (pet: Pet | any) => {
+    console.log(`Đã chọn thú cưng: ${pet.name || pet.info?.name}`);
+    
+    try {
+      // Nếu là dữ liệu thú cưng từ API
+      if ('_id' in pet) {
+        // Chuyển hướng đến trang pet profile với petId
+        router.push({
+          pathname: '/(tabs)/pet',
+          params: { petId: pet._id }
+        });
+      } else {
+        // Nếu là dữ liệu mẫu
+        router.push({
+          pathname: '/(tabs)/pet',
+          params: { samplePetId: pet.id.toString() }
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi điều hướng đến trang profile của thú cưng:", error);
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, styles.loadingContainer, { backgroundColor }]}>
@@ -145,7 +170,7 @@ export default function HomeScreen() {
                 <PetCard 
                   key={pet._id} 
                   pet={pet} 
-                  onPress={() => console.log(`Selected pet: ${pet.info.name}`)}
+                  onPress={() => handleSelectPet(pet)}
                 />
               ))
             ) : (
@@ -153,7 +178,7 @@ export default function HomeScreen() {
                 <PetCard 
                   key={pet.id} 
                   pet={pet} 
-                  onPress={() => console.log(`Selected pet: ${pet.name}`)}
+                  onPress={() => handleSelectPet(pet)}
                 />
               ))
             )}
