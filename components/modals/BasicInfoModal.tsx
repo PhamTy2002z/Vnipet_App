@@ -200,13 +200,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontFamily: Fonts.SFProDisplay.semibold,
-    fontSize: 18,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 16,
     color: '#000',
   },
   subtitle: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     marginTop: 4,
   },
@@ -221,17 +221,17 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: Fonts.SFProText.medium,
-    fontSize: 14,
+    fontSize: 13,
     color: '#333',
     marginBottom: 8,
   },
   input: {
-    fontFamily: Fonts.SFProText.regular,
+    fontFamily: Fonts.SFProText.medium,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 12,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
   },
   dateButton: {
     flexDirection: 'row',
@@ -243,17 +243,17 @@ const styles = StyleSheet.create({
     height: 50,
   },
   dateButtonText: {
-    fontFamily: Fonts.SFProText.regular,
+    fontFamily: Fonts.SFProText.medium,
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
   },
   textarea: {
-    fontFamily: Fonts.SFProText.regular,
+    fontFamily: Fonts.SFProText.medium,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 12,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     height: 100,
     textAlignVertical: 'top',
   },
@@ -280,9 +280,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   cancelButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
   },
   saveButton: {
     flex: 1,
@@ -296,9 +296,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#A5A5A5',
   },
   saveButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   iosButtonContainer: {
     flexDirection: 'row',
@@ -312,8 +312,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   iosButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 14,
+    fontSize: 13,
   },
 }); 

@@ -19,11 +19,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { key: 'home', icon: 'home', label: 'Home', route: '/(tabs)' },
+  { key: 'home', icon: 'home', label: 'Trang Chủ', route: '/(tabs)' },
   { key: 'store', icon: 'cart', label: 'Cửa Hàng', route: '/(tabs)/store' },
   { key: 'scan', icon: 'scan', label: 'Scan', route: '/scan', isSpecial: true },
   { key: 'orders', icon: 'reader', label: 'Đơn hàng', route: '/(tabs)/purchasehistory' },
-  { key: 'profile', icon: 'person', label: 'Profile', route: '/(tabs)/profile' },
+  { key: 'profile', icon: 'person', label: 'Hồ sơ', route: '/(tabs)/profile' },
 ];
 
 export default function BottomNavbar() {
@@ -42,8 +42,16 @@ export default function BottomNavbar() {
     // Add haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // Navigate to the route
-    router.navigate(item.route as any);
+    // If already on that tab, do nothing
+    if (getIsActive(item)) return;
+    
+    // For tab navigation inside (tabs) group, we muốn thay thế thay vì push để tránh chồng màn hình
+    if (item.route.startsWith('/(tabs)')) {
+      router.replace(item.route as any);
+    } else {
+      // Các route đặc biệt như /scan có thể sử dụng navigate / push
+      router.navigate(item.route as any);
+    }
   };
 
   // Generate container styles based on theme

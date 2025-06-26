@@ -1,16 +1,16 @@
+import { Colors } from '@/constants/Colors';
+import { Fonts } from '@/constants/Fonts';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import {
     Animated,
     Dimensions,
-    PanResponder,
     StyleSheet,
     Text,
-    TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { PanGestureHandler, PanGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
 
 interface Theme {
   id: number;
@@ -58,457 +58,182 @@ const themes: Theme[] = [
   },
 ];
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SWIPE_THRESHOLD = 120;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = SCREEN_WIDTH - 40; // 20px padding on each side
+const CARD_HEIGHT = 180;
+const VISIBLE_ITEMS = 3;
 
 export default function SwipeableThemeCards() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const position = useRef(new Animated.ValueXY()).current;
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const textColor = isDark ? Colors.dark.text : Colors.light.text;
+  const subTextColor = isDark ? Colors.dark.icon : Colors.light.icon;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (_, gesture) => {
-        return Math.abs(gesture.dx) > Math.abs(gesture.dy);
-      },
-      onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: 0 });
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > SWIPE_THRESHOLD) {
-          forceSwipeRight();
-        } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          forceSwipeLeft();
-        } else {
-          resetPosition();
-        }
-      },
-    })
-  ).current;
-
-  const forceSwipeLeft = () => {
-    Animated.timing(position, {
-      toValue: { x: -SCREEN_WIDTH * 1.5, y: 0 },
-      duration: 250,
-      useNativeDriver: false,
-    }).start(() => {
-      setCurrentIndex((prevIndex) => (prevIndex + 1) % themes.length);
-      position.setValue({ x: 0, y: 0 });
-    });
-  };
-
-  const forceSwipeRight = () => {
-    Animated.timing(position, {
-      toValue: { x: SCREEN_WIDTH * 1.5, y: 0 },
-      duration: 250,
-      useNativeDriver: false,
-    }).start(() => {
-      setCurrentIndex((prevIndex) => (prevIndex - 1 + themes.length) % themes.length);
-      position.setValue({ x: 0, y: 0 });
-    });
-  };
-
-  const resetPosition = () => {
-    Animated.spring(position, {
-      toValue: { x: 0, y: 0 },
-      stiffness: 200,
-      damping: 20,
-      mass: 1,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      forceSwipeRight();
-    } else {
-      // Cycle to the end if at the beginning
-      setCurrentIndex(themes.length - 1);
-      position.setValue({ x: 0, y: 0 });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const translateX = useRef(new Animated.Value(0)).current;
+  
+  // Xử lý khi người dùng vuốt
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: translateX } }],
+    { useNativeDriver: true }
+  );
+  
+  // Xử lý khi người dùng kết thúc vuốt
+  const onHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const { translationX } = event.nativeEvent;
+      
+      // Nếu vuốt đủ xa, chuyển đến thẻ tiếp theo hoặc trước đó
+      if (translationX < -50 && currentIndex < themes.length - 1) {
+        // Vuốt sang trái -> thẻ tiếp theo
+        setCurrentIndex(currentIndex + 1);
+      } else if (translationX > 50 && currentIndex > 0) {
+        // Vuốt sang phải -> thẻ trước đó
+        setCurrentIndex(currentIndex - 1);
+      }
+      
+      // Reset vị trí
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
     }
   };
-
-  const handleNext = () => {
-    if (currentIndex < themes.length - 1) {
-      forceSwipeLeft();
-    } else {
-      // Cycle to the beginning if at the end
-      setCurrentIndex(0);
-      position.setValue({ x: 0, y: 0 });
-    }
-  };
-
-  const getVisibleThemes = () => {
-    const visible = [];
+  
+  // Hiển thị các thẻ theme
+  const renderCards = () => {
+    const cards = [];
     
-    // Get current card
-    visible.push({...themes[currentIndex], stackIndex: 0});
-    
-    // Get next card if available
-    const nextIndex = (currentIndex + 1) % themes.length;
-    if (nextIndex !== currentIndex) {
-      visible.push({...themes[nextIndex], stackIndex: 1});
-    }
-    
-    // Get one more card if available
-    const nextNextIndex = (currentIndex + 2) % themes.length;
-    if (nextNextIndex !== currentIndex && nextNextIndex !== nextIndex) {
-      visible.push({...themes[nextNextIndex], stackIndex: 2});
-    }
-    
-    return visible;
-  };
-
-  const getCardStyle = (stackIndex: number) => {
-    const isTopCard = stackIndex === 0;
-    
-    if (isTopCard) {
-      const rotate = position.x.interpolate({
-        inputRange: [-SCREEN_WIDTH * 1.5, 0, SCREEN_WIDTH * 1.5],
-        outputRange: ['-30deg', '0deg', '30deg'],
-        extrapolate: 'clamp'
-      });
-
-      return {
-        ...styles.card,
-        zIndex: 10 - stackIndex,
+    // Hiển thị tối đa VISIBLE_ITEMS thẻ, bắt đầu từ currentIndex
+    for (let i = 0; i < VISIBLE_ITEMS; i++) {
+      const dataIndex = currentIndex + i;
+      
+      // Nếu vượt quá số lượng theme có sẵn, dừng lại
+      if (dataIndex >= themes.length) break;
+      
+      const theme = themes[dataIndex];
+      const isFirst = i === 0;
+      
+      // Tính toán style cho từng thẻ
+      const cardStyle = {
         transform: [
-          { translateX: position.x },
-          { rotate },
-          { scale: 1 }
+          {
+            translateX: isFirst
+              ? translateX
+              : new Animated.Value(0),
+          },
+          {
+            scale: isFirst ? 1 : 0.9 - i * 0.05,
+          },
         ],
-        opacity: 1
+        top: i * 10,
+        zIndex: VISIBLE_ITEMS - i,
+        opacity: isFirst ? 1 : 0.7 - i * 0.2,
       };
-    }
-
-    // Style for stacked cards
-    const scale = 1 - stackIndex * 0.05;
-    const translateY = stackIndex * 8;
-    const opacity = 1 - stackIndex * 0.2;
-
-    return {
-      ...styles.card,
-      zIndex: 10 - stackIndex,
-      transform: [
-        { translateY },
-        { scale }
-      ],
-      opacity
-    };
-  };
-
-  const renderThemeCards = () => {
-    return getVisibleThemes().map((theme, index) => {
-      const { id, name, gradientColors, description, isPremium, stackIndex } = theme;
-      const isTopCard = stackIndex === 0;
-
-      return (
-        <Animated.View 
-          key={id} 
-          style={getCardStyle(stackIndex)}
-          {...(isTopCard ? panResponder.panHandlers : {})}
-        >
-          <LinearGradient 
-            colors={gradientColors} 
+      
+      cards.push(
+        <Animated.View key={theme.id} style={[styles.card, cardStyle]}>
+          <LinearGradient
+            colors={theme.gradientColors}
             style={styles.cardContent}
-            start={{ x: 0, y: 0 }} 
+            start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            {/* Header placeholders */}
-            <View style={styles.cardHeader}>
-              <View style={styles.avatarPlaceholder}>
-                <View style={styles.innerPlaceholder}></View>
-              </View>
-              <View style={styles.menuPlaceholder}></View>
-            </View>
-
-            <View style={styles.contentPlaceholders}>
-              <View style={styles.textPlaceholderLarge}></View>
-              <View style={styles.textPlaceholderSmall}></View>
-            </View>
-
-            {/* Content placeholders */}
-            <View style={styles.petsPlaceholder}>
-              <View style={styles.petRow}>
-                <View style={styles.petAvatar}></View>
-                <View style={styles.petInfo}>
-                  <View style={styles.petNamePlaceholder}></View>
-                  <View style={styles.petSpeciesPlaceholder}></View>
-                </View>
-              </View>
-              <View style={styles.petRow}>
-                <View style={styles.petAvatar}></View>
-                <View style={styles.petInfo}>
-                  <View style={styles.petNamePlaceholder}></View>
-                  <View style={styles.petSpeciesPlaceholder}></View>
-                </View>
-              </View>
-            </View>
-
-            {/* Theme info */}
-            <View style={styles.themeInfo}>
-              <Text style={styles.themeName}>{name}</Text>
-              <Text style={styles.themeDescription}>{description}</Text>
-              <View style={styles.themeFooter}>
-                <View style={[
-                  styles.badge,
-                  isPremium ? styles.premiumBadge : styles.freeBadge
-                ]}>
-                  <Text style={[
-                    styles.badgeText,
-                    isPremium ? styles.premiumText : styles.freeText
-                  ]}>
-                    {isPremium ? 'Premium' : 'Miễn phí'}
-                  </Text>
-                </View>
-                <Text style={styles.pageIndicator}>
-                  {currentIndex + 1} / {themes.length}
-                </Text>
-              </View>
+            <Text style={styles.themeName}>{theme.name}</Text>
+            <Text style={styles.themeDescription}>{theme.description}</Text>
+            
+            <View style={styles.cardIndicator}>
+              {themes.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicatorDot,
+                    currentIndex === index && styles.activeDot,
+                  ]}
+                />
+              ))}
             </View>
           </LinearGradient>
         </Animated.View>
       );
-    });
+    }
+    
+    return cards;
   };
-
+  
   return (
     <View style={styles.container}>
-      {/* Navigation buttons */}
-      <TouchableOpacity
-        onPress={handlePrevious}
-        style={[styles.navButton, styles.leftButton]}
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
       >
-        <Ionicons name="chevron-back" size={20} color={isDark ? '#FFF' : '#444'} />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={handleNext}
-        style={[styles.navButton, styles.rightButton]}
-      >
-        <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFF' : '#444'} />
-      </TouchableOpacity>
-
-      {/* Card stack */}
-      <View style={styles.cardContainer}>
-        {renderThemeCards()}
-      </View>
-
-      {/* Dots indicator */}
-      <View style={styles.dotsContainer}>
-        {themes.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              index === currentIndex ? styles.activeDot : null
-            ]}
-          />
-        ))}
-      </View>
+        <Animated.View style={styles.cardsContainer}>
+          {renderCards()}
+        </Animated.View>
+      </PanGestureHandler>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    height: 480,
+    height: CARD_HEIGHT + 20, // Extra space for stacked cards
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
   },
-  cardContainer: {
-    width: '100%',
-    height: 450,
+  cardsContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
     position: 'absolute',
-    width: '90%',
-    height: 400,
-    borderRadius: 20,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardContent: {
     flex: 1,
-    borderRadius: 20,
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  innerPlaceholder: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  menuPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  contentPlaceholders: {
-    marginBottom: 30,
-  },
-  textPlaceholderLarge: {
-    width: 120,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 10,
-  },
-  textPlaceholderSmall: {
-    width: 90,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  petsPlaceholder: {
-    marginBottom: 20,
-    gap: 12,
-  },
-  petRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  petAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginRight: 10,
-  },
-  petInfo: {
-    flex: 1,
-  },
-  petNamePlaceholder: {
-    width: 100,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 6,
-  },
-  petSpeciesPlaceholder: {
-    width: 80,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  themeInfo: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    paddingTop: 15,
+    padding: 16,
+    justifyContent: 'flex-end',
   },
   themeName: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: 'white',
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 16,
     marginBottom: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   themeDescription: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 10,
-  },
-  themeFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-  },
-  premiumBadge: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.3)',
-  },
-  freeBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  badgeText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontFamily: Fonts.SFProText.regular,
     fontSize: 12,
-    fontWeight: '500',
+    marginBottom: 14,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
-  premiumText: {
-    color: '#FBBF24',
-  },
-  freeText: {
-    color: '#FFFFFF',
-  },
-  pageIndicator: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  navButton: {
-    position: 'absolute',
-    zIndex: 100,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  leftButton: {
-    left: 10,
-    top: '50%',
-    marginTop: -20,
-  },
-  rightButton: {
-    right: 10,
-    top: '50%',
-    marginTop: -20,
-  },
-  dotsContainer: {
-    position: 'absolute',
-    bottom: 10,
+  cardIndicator: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
+    marginBottom: 8,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  indicatorDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    marginRight: 5,
   },
   activeDot: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'white',
+    width: 15,
+    height: 5,
   },
 }); 

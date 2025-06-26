@@ -292,13 +292,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontFamily: Fonts.SFProDisplay.semibold,
-    fontSize: 18,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 16,
     color: '#000',
   },
   subtitle: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     marginTop: 4,
   },
@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontFamily: Fonts.SFProText.semibold,
-    fontSize: 16,
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 14,
     color: '#333',
     marginBottom: 12,
   },
@@ -322,8 +322,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontFamily: Fonts.SFProText.medium,
-    fontSize: 14,
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 13,
     color: '#333',
     marginBottom: 8,
   },
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 12,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     height: 50,
   },
   dateButton: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   dateButtonText: {
     fontFamily: Fonts.SFProText.regular,
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
   },
   addButton: {
     backgroundColor: '#479696',
@@ -358,9 +358,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   addButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   cancelEditButton: {
     backgroundColor: '#FF5648',
@@ -370,9 +370,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   cancelEditButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   scheduleSection: {
     marginBottom: 20,
@@ -426,9 +426,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   cancelButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
   },
   saveButton: {
     flex: 1,
@@ -439,13 +439,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   saveButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   emptyText: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#999',
     fontStyle: 'italic',
   },

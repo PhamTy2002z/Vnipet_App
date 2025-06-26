@@ -1108,12 +1108,15 @@ export default function PetScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: accentColor }]}>Profile</Text>
+        <View style={styles.headerTitleContainer}>
+          <MaterialCommunityIcons name="paw" size={24} color="#333" style={styles.headerIcon} />
+          <Text style={styles.headerTitle}>Định danh thú cưng</Text>
+        </View>
         <TouchableOpacity 
           style={styles.menuButton} 
           onPress={handleOpenPetSelector}
         >
-          <Entypo name="menu" size={22} color={accentColor} />
+          <Entypo name="menu" size={22} color="#333" />
         </TouchableOpacity>
       </View>
       
@@ -1427,16 +1430,28 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
     position: 'relative',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIcon: {
+    marginRight: 8,
   },
   headerTitle: {
-    fontFamily: Fonts.SFProDisplay.semibold,
-    fontSize: 16,
-    textAlign: 'center',
+    fontFamily: Fonts.SFProDisplay.bold,
+    fontSize: 18,
+    color: '#333',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   menuButton: {
     position: 'absolute',
@@ -1503,26 +1518,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   petName: {
-    fontFamily: Fonts.SFProDisplay.bold,
-    fontSize: 20,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 18,
     marginBottom: 4,
   },
   petBreed: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     marginBottom: 16,
   },
   changeProfileButton: {
-    fontFamily: Fonts.SFProText.medium,
-    fontSize: 12,
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 11,
     textDecorationLine: 'underline',
   },
   traitsSection: {
     marginBottom: 20,
   },
   traitTitle: {
-    fontFamily: Fonts.SFProDisplay.semibold,
-    fontSize: 14,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 13,
     marginBottom: 10,
   },
   traitsRow: {
@@ -1536,12 +1551,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   traitText: {
-    fontFamily: Fonts.SFProText.medium,
-    fontSize: 12,
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 11,
   },
   detailsTitle: {
-    fontFamily: Fonts.SFProDisplay.bold,
-    fontSize: 24,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 22,
     marginBottom: 20,
   },
   detailsContainer: {
@@ -1564,13 +1579,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailCardTitle: {
-    fontFamily: Fonts.SFProText.semibold,
-    fontSize: 14,
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 13,
     marginBottom: 6,
   },
   detailCardDescription: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 12,
+    fontSize: 11,
     lineHeight: 16,
   },
   bookmarkIcon: {
@@ -1610,8 +1625,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   bottomSheetTitle: {
-    fontFamily: Fonts.SFProDisplay.bold,
-    fontSize: 18,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 16,
     color: '#333333',
     flex: 1,
   },
@@ -1658,14 +1673,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   petSelectorName: {
-    fontFamily: Fonts.SFProText.semibold,
-    fontSize: 16,
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 15,
     color: '#333333',
     marginBottom: 3,
   },
   petSelectorType: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#666666',
   },
   petSelectorArrow: {

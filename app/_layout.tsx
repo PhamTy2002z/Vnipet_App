@@ -46,17 +46,16 @@ export default function RootLayout() {
   const checkAuthState = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('@vnipet_access_token');
-      const rememberMe = await AsyncStorage.getItem('@vnipet_remember_me');
       
-      // Nếu có token và người dùng đã chọn "Remember me"
-      if (token && rememberMe === 'true') {
+      // Chỉ cho phép vào ứng dụng nếu có token hợp lệ
+      if (token) {
         // Chuyển hướng đến trang chính sau khi splash screen đóng
-        console.log('Phát hiện phiên đăng nhập đã lưu, tự động đăng nhập');
+        console.log('Phát hiện phiên đăng nhập, tự động đăng nhập');
         setTimeout(() => {
           router.replace('/(tabs)');
         }, 100);
       } else {
-        // Nếu không có token hoặc không chọn "Remember me", chuyển đến trang login
+        // Nếu không có token, luôn chuyển đến trang login
         setTimeout(() => {
           router.replace('/login');
         }, 100);

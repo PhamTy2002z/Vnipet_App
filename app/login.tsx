@@ -94,6 +94,10 @@ export default function LoginScreen() {
     router.replace('/signup');
   };
 
+  const navigateToForgotPassword = () => {
+    router.push('/forgot-password' as any);
+  };
+
   return (
     <>
       <StatusBar style="light" />
@@ -166,7 +170,7 @@ export default function LoginScreen() {
                     <Text style={styles.rememberText}>Remember me</Text>
                   </TouchableOpacity>
                   
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={navigateToForgotPassword}>
                     <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                   </TouchableOpacity>
                 </View>

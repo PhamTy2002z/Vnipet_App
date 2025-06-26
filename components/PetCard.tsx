@@ -1,6 +1,8 @@
 import { Colors } from '@/constants/Colors';
+import { Fonts } from '@/constants/Fonts';
 import { PetData } from '@/contexts/UserContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -75,6 +77,34 @@ export default function PetCard({ pet, onPress }: PetCardProps) {
     petAvatar = samplePet.avatar;
   }
 
+  // Xác định trạng thái sức khỏe
+  const getStatusInfo = () => {
+    const status = pet.status || 'healthy';
+    switch (status) {
+      case 'checkup':
+        return {
+          text: 'Checkup needed',
+          color: '#F59E0B',
+          icon: 'calendar-outline'
+        };
+      case 'sick':
+        return {
+          text: 'Needs attention',
+          color: '#EF4444',
+          icon: 'alert-circle-outline'
+        };
+      case 'healthy':
+      default:
+        return {
+          text: 'Healthy',
+          color: '#10B981',
+          icon: 'checkmark-circle-outline'
+        };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
+
   return (
     <TouchableOpacity 
       style={[
@@ -115,6 +145,15 @@ export default function PetCard({ pet, onPress }: PetCardProps) {
             {petSpecies}
           </Text>
         </View>
+
+        <View style={styles.statusContainer}>
+          <View style={[styles.statusIndicator, { backgroundColor: statusInfo.color }]}>
+            <Ionicons name={statusInfo.icon as any} size={12} color="white" />
+          </View>
+          <Text style={[styles.statusText, { color: statusInfo.color }]}>
+            {statusInfo.text}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -139,34 +178,51 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 2,
     borderColor: '#e5e7eb',
   },
   avatarFallback: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#e5e7eb',
   },
   fallbackText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontFamily: Fonts.SFProDisplay.medium,
   },
   infoContainer: {
     flex: 1,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontFamily: Fonts.SFProDisplay.medium,
     marginBottom: 3,
   },
   species: {
-    fontSize: 14,
+    fontSize: 11,
+    fontFamily: Fonts.SFProText.regular,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontFamily: Fonts.SFProText.regular,
   }
 }); 

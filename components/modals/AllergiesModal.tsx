@@ -266,13 +266,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EEEEEE',
   },
   title: {
-    fontFamily: Fonts.SFProDisplay.bold,
-    fontSize: 20,
+    fontFamily: Fonts.SFProDisplay.medium,
+    fontSize: 18,
     color: '#333333',
   },
   subtitle: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#666666',
     marginTop: 4,
   },
@@ -287,8 +287,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontFamily: Fonts.SFProText.medium,
-    fontSize: 14,
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 13,
     color: '#333333',
     marginBottom: 8,
   },
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 12,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
   },
   textarea: {
     fontFamily: Fonts.SFProText.regular,
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     borderRadius: 12,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     height: 100,
     textAlignVertical: 'top',
   },
@@ -317,9 +317,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   allergyItem: {
     flexDirection: 'row',
@@ -334,14 +334,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   allergyName: {
-    fontFamily: Fonts.SFProText.semibold,
-    fontSize: 16,
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 13,
     color: '#333',
     marginBottom: 4,
   },
   allergyNotes: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   deleteButton: {
@@ -363,9 +363,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   cancelButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: '#C93F8D',
-    fontSize: 16,
+    fontSize: 14,
   },
   saveButton: {
     flex: 1,
@@ -376,16 +376,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   saveButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   addSection: {
     marginBottom: 20,
   },
   sectionTitle: {
-    fontFamily: Fonts.SFProText.semibold,
-    fontSize: 16,
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 14,
     color: '#333',
     marginBottom: 16,
   },
@@ -404,16 +404,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   cancelEditButtonText: {
-    fontFamily: Fonts.SFProText.medium,
+    fontFamily: Fonts.SFProText.regular,
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
   },
   allergySection: {
     marginBottom: 20,
   },
   emptyText: {
     fontFamily: Fonts.SFProText.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: '#999',
     fontStyle: 'italic',
     textAlign: 'center',

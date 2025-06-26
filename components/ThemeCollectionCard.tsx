@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/Colors';
+import { Fonts } from '@/constants/Fonts';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,7 +50,7 @@ export default function ThemeCollectionCard({ theme, onPress }: ThemeCollectionC
         
         {theme.isPremium && (
           <View style={styles.premiumBadge}>
-            <Ionicons name="star" size={16} color="#f59e0b" />
+            <Ionicons name="star" size={10} color="#fff" />
           </View>
         )}
       </View>
@@ -57,7 +58,7 @@ export default function ThemeCollectionCard({ theme, onPress }: ThemeCollectionC
       <Text style={[
         styles.themeName,
         { color: isDark ? Colors.dark.text : Colors.light.text }
-      ]}>
+      ]} numberOfLines={1}>
         {theme.name}
       </Text>
       
@@ -88,10 +89,10 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    height: 120,
+    height: 110,
     borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   image: {
     width: '100%',
@@ -102,31 +103,31 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   themeName: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12,
+    fontFamily: Fonts.SFProDisplay.medium,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   premiumBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
   },
   premiumTag: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
     borderRadius: 4,
     alignSelf: 'center',
   },
   premiumText: {
-    fontSize: 10,
-    fontWeight: '500',
+    fontSize: 8,
+    fontFamily: Fonts.SFProText.regular,
     color: '#b45309',
     textAlign: 'center',
   },
