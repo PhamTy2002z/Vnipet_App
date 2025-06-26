@@ -1,17 +1,20 @@
+import { API_BASE_URL, DEFAULT_HEADERS } from '@/api/config/apiConfig';
 import { Fonts } from '@/constants/Fonts';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Dimensions,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 // Kích thước màn hình
@@ -82,10 +85,84 @@ const allCards = [
   },
 ];
 
+// Hàm định dạng giá VND
+const formatPriceVND = (price: number): string => {
+  if (price === 0) return 'FREE';
+  // Sử dụng toLocaleString để thêm dấu phẩy ngăn cách nghìn và ký hiệu đ ở cuối
+  return `${price.toLocaleString('vi-VN')}đ`;
+};
+
 export default function StoreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('1');
   const [favorites, setFavorites] = useState<string[]>(['2']);
+
+  // Danh sách theme và trạng thái tải
+  const [themes, setThemes] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Fetch danh sách theme từ backend
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/store/themes`, {
+          method: 'GET',
+          headers: {
+            ...DEFAULT_HEADERS,
+          },
+        });
+        const data = await response.json();
+
+        // Chuẩn hóa dữ liệu để phù hợp UI hiện tại
+        const transformed = Array.isArray(data)
+          ? data.map((item: any) => ({
+              id: item._id,
+              name: item.name,
+              price: item.price || 0,
+              image: item.imageUrl || '',
+              tag: item.price === 0 ? 'FREE' : item.isPremium ? 'PREMIUM' : 'BEST SELLER',
+              isFavorite: false,
+            }))
+          : [];
+
+        setThemes(transformed);
+      } catch (error) {
+        console.error('Lỗi tải theme:', error);
+        Alert.alert('Lỗi', 'Không thể tải danh sách theme. Vui lòng thử lại sau.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchThemes();
+  }, []);
+
+  // Phân loại theme
+  const popularCards = themes.slice(0, 2);
+
+  const filterThemesByCategory = () => {
+    switch (activeCategory) {
+      case '2':
+        return themes.filter((t) => t.price === 0);
+      case '3':
+        return themes.filter((t) => t.price > 0);
+      case '4':
+        return themes.filter((t) => t.tag === 'BEST SELLER');
+      default:
+        return themes;
+    }
+  };
+
+  const allCards = filterThemesByCategory();
+
+  // Hiển thị loader khi đang tải dữ liệu
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color="#3B82F6" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />
+      </SafeAreaView>
+    );
+  }
 
   const toggleFavorite = (id: string) => {
     if (favorites.includes(id)) {
@@ -194,7 +271,7 @@ export default function StoreScreen() {
                   <Text style={styles.productName}>{card.name}</Text>
                   <View style={styles.productPriceRow}>
                     <Text style={styles.productPrice}>
-                      {card.price > 0 ? `$${card.price.toFixed(2)}` : 'FREE'}
+                      {formatPriceVND(card.price)}
                     </Text>
                     <TouchableOpacity style={styles.addToCartButton}>
                       <Ionicons name="add" size={24} color="white" />
@@ -262,7 +339,7 @@ export default function StoreScreen() {
                   <Text style={styles.productName}>{card.name}</Text>
                   <View style={styles.productPriceRow}>
                     <Text style={styles.productPrice}>
-                      {card.price > 0 ? `$${card.price.toFixed(2)}` : 'FREE'}
+                      {formatPriceVND(card.price)}
                     </Text>
                     <TouchableOpacity style={styles.addToCartButton}>
                       <Ionicons name="add" size={24} color="white" />
@@ -284,7 +361,7 @@ export default function StoreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#F5F7FA',
   },
   header: {
     flexDirection: 'row',
@@ -422,11 +499,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 16,
     backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
     overflow: 'hidden',
   },
   productImageContainer: {
     height: 150,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'white',
     borderRadius: 16,
     padding: 10,
     position: 'relative',
