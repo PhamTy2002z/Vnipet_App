@@ -77,7 +77,9 @@ class TokenManager {
       deviceId
     };
 
-    const accessToken = this.generateAccessToken(payload);
+    // Nếu user là petOwner (dùng ứng dụng mobile) thì cấp access token với thời hạn rất dài (20 năm)
+    // nhằm tránh việc token hết hạn gây buộc đăng nhập lại. Các role khác giữ nguyên mặc định.
+    const accessToken = this.generateAccessToken(payload, userType === 'petOwner' ? '20y' : null);
     const refreshTokenData = await this.generateRefreshToken(
       user._id,
       userType,

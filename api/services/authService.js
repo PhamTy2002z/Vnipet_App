@@ -42,7 +42,7 @@ const fetchUserDashboard = async () => {
       throw new Error('Token không tồn tại');
     }
     
-    const response = await apiClient.get('/user/dashboard', {
+    const response = await apiClient.get(ENDPOINTS.USER.DASHBOARD, {
       headers: {
         ...DEFAULT_HEADERS,
         'Authorization': `Bearer ${token}`

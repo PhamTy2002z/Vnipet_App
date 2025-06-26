@@ -1,27 +1,36 @@
 import { AntDesign, Feather } from '@expo/vector-icons';
+import * as Device from 'expo-device';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:8000/api/v1';
 
 type ForgotPasswordStep = 'email' | 'verify' | 'reset';
+
+const getMobileHeaders = () => ({
+  'platform': Platform.OS,
+  'device-type': 'mobile',
+  'app-version': Device.osBuildId ? Device.osBuildId.toString() : '1.0.0',
+  'device-id': Device.deviceName ? encodeURIComponent(Device.deviceName) : 'expo-device',
+});
 
 export default function ForgotPasswordScreen() {
   // Không cần useEffect để thiết lập StatusBar vì chúng ta sẽ sử dụng StatusBar component
@@ -33,25 +42,48 @@ export default function ForgotPasswordScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [resetToken, setResetToken] = useState('');
 
   // Refs for OTP input fields
   const otpInputRefs = useRef<(TextInput | null)[]>([null, null, null, null]);
 
-  const handleSendResetLink = () => {
+  const handleSendResetLink = async () => {
     if (!email) {
       Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ email');
       return;
     }
 
     setIsLoading(true);
-    // Mô phỏng gọi API gửi link đặt lại mật khẩu
-    setTimeout(() => {
+    setErrorMessage('');
+    
+    try {
+      const response = await fetch(`${API_URL}/pet-owner/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getMobileHeaders(),
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Không thể gửi mã OTP. Vui lòng thử lại sau.');
+      }
+      
       setIsLoading(false);
+      Alert.alert('Thành công', 'Mã xác thực đã được gửi đến email của bạn');
       setCurrentStep('verify');
-    }, 1500);
+    } catch (error: any) {
+      setIsLoading(false);
+      setErrorMessage(error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+      Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+    }
   };
 
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
     const otpValue = otp.join('');
     if (otpValue.length !== 4) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ mã xác thực');
@@ -59,14 +91,44 @@ export default function ForgotPasswordScreen() {
     }
 
     setIsLoading(true);
-    // Mô phỏng gọi API xác thực mã OTP
-    setTimeout(() => {
+    setErrorMessage('');
+    
+    try {
+      const response = await fetch(`${API_URL}/pet-owner/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getMobileHeaders(),
+        },
+        body: JSON.stringify({ 
+          email,
+          otp: otpValue
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Mã xác thực không đúng. Vui lòng thử lại.');
+      }
+      
       setIsLoading(false);
-      setCurrentStep('reset');
-    }, 1500);
+      setResetToken(data.resetToken);
+      
+      // Hiển thị thông báo trước khi chuyển sang bước tiếp theo
+      Alert.alert(
+        'Xác thực thành công', 
+        'Mã OTP đúng. Bạn có thể thiết lập mật khẩu mới.',
+        [{ text: 'Tiếp tục', onPress: () => setCurrentStep('reset') }]
+      );
+    } catch (error: any) {
+      setIsLoading(false);
+      setErrorMessage(error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+      Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+    }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (newPassword.length < 8) {
       Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 8 ký tự');
       return;
@@ -78,15 +140,40 @@ export default function ForgotPasswordScreen() {
     }
 
     setIsLoading(true);
-    // Mô phỏng gọi API đặt lại mật khẩu
-    setTimeout(() => {
+    setErrorMessage('');
+    
+    try {
+      const response = await fetch(`${API_URL}/pet-owner/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getMobileHeaders(),
+        },
+        body: JSON.stringify({ 
+          email,
+          resetToken,
+          newPassword
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Không thể đặt lại mật khẩu. Vui lòng thử lại sau.');
+      }
+      
       setIsLoading(false);
+      setResetToken(data.resetToken);
       Alert.alert(
         'Thành công', 
         'Mật khẩu đã được đặt lại thành công', 
         [{ text: 'OK', onPress: () => router.replace('/login') }]
       );
-    }, 1500);
+    } catch (error: any) {
+      setIsLoading(false);
+      setErrorMessage(error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+      Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+    }
   };
 
   const handleOtpChange = (text: string, index: number) => {
@@ -112,13 +199,39 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const handleResendCode = () => {
+  const handleResendCode = async () => {
+    if (!email) {
+      Alert.alert('Lỗi', 'Không thể xác định email. Vui lòng thử lại từ đầu.');
+      setCurrentStep('email');
+      return;
+    }
+
     setIsLoading(true);
-    // Mô phỏng gọi API gửi lại mã OTP
-    setTimeout(() => {
+    setErrorMessage('');
+    
+    try {
+      const response = await fetch(`${API_URL}/pet-owner/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getMobileHeaders(),
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.');
+      }
+      
       setIsLoading(false);
       Alert.alert('Thông báo', 'Mã xác thực mới đã được gửi đến email của bạn');
-    }, 1500);
+    } catch (error: any) {
+      setIsLoading(false);
+      setErrorMessage(error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+      Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.');
+    }
   };
 
   const navigateBack = () => {
@@ -153,6 +266,8 @@ export default function ForgotPasswordScreen() {
           />
         </View>
       </View>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <TouchableOpacity 
         style={[styles.primaryButton, isLoading && styles.disabledButton]} 
@@ -203,6 +318,8 @@ export default function ForgotPasswordScreen() {
           />
         ))}
       </View>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <Text style={styles.resendText}>
         Didn&apos;t receive the code?
@@ -280,6 +397,8 @@ export default function ForgotPasswordScreen() {
           </Pressable>
         </View>
       </View>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <Text style={styles.passwordRequirement}>
         Password must be at least 8 characters long
@@ -541,5 +660,11 @@ const styles = StyleSheet.create({
   footerLink: {
     color: 'white',
     fontWeight: '500',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 14,
+    marginBottom: 15,
+    textAlign: 'center',
   },
 }); 

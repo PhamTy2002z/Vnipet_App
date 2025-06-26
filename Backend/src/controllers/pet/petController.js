@@ -93,7 +93,7 @@ exports.scanAndLinkQR = async (req, res) => {
     const scan = new QRScan({
       qrToken,
       petId: pet._id,
-      scannedBy: userId,
+      userId: userId,
       action: 'link',
       actionSuccess: true,
     });

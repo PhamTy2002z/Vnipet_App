@@ -96,7 +96,7 @@ export default function PetCard({ pet, onPress }: PetCardProps) {
       case 'healthy':
       default:
         return {
-          text: 'Healthy',
+          text: 'Open',
           color: '#10B981',
           icon: 'checkmark-circle-outline'
         };
