@@ -1,6 +1,10 @@
 import { API_BASE_URL, DEFAULT_HEADERS } from '@/api/config/apiConfig';
 import { Fonts } from '@/constants/Fonts';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
@@ -8,6 +12,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -17,91 +22,282 @@ import {
     View
 } from 'react-native';
 
-// Kích thước màn hình
-const { width } = Dimensions.get('window');
-const itemWidth = (width - 60) / 2; // 2 items per row with padding
+// Screen dimensions
+const { width, height } = Dimensions.get('window');
+const itemWidth = (width - 60) / 2;
 
-// Dữ liệu mẫu cho thẻ phổ biến
+// Modern color palette
+const Colors = {
+  primary: '#6366F1',
+  primaryDark: '#4F46E5',
+  secondary: '#F1F5F9',
+  accent: '#10B981',
+  background: '#FAFBFC',
+  surface: '#FFFFFF',
+  text: {
+    primary: '#0F172A',
+    secondary: '#64748B',
+    tertiary: '#94A3B8',
+  },
+  border: '#E2E8F0',
+  error: '#EF4444',
+  warning: '#F59E0B',
+  success: '#10B981',
+  gradient: {
+    primary: ['#6366F1', '#8B5CF6'] as const,
+    secondary: ['#F8FAFC', '#F1F5F9'] as const,
+    accent: ['#10B981', '#059669'] as const,
+  }
+};
+
+// Sample data for popular cards
 const popularCards = [
   {
     id: '1',
     name: 'Ocean Theme',
-    price: 302.00,
+    price: 302000,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/35a6f47c-19d1-4226-a30d-c4a74db5a6d7/air-jordan-1-low-shoes-6Q1tFM.png',
     tag: 'BEST SELLER',
     isFavorite: false,
+    rating: 4.8,
+    reviews: 124,
   },
   {
     id: '2',
     name: 'Mountain Theme',
-    price: 752.00,
+    price: 752000,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/756d9f2b-9330-42a0-83bd-823279774574/air-max-excee-shoes-lPbXqt.png',
-    tag: 'BEST SELLER',
+    tag: 'PREMIUM',
     isFavorite: true,
+    rating: 4.9,
+    reviews: 89,
   },
 ];
 
-// Dữ liệu mẫu cho danh mục
+// Categories data
 const categories = [
-  { id: '1', title: 'All Cards', isActive: true },
-  { id: '2', title: 'Free', isActive: false },
-  { id: '3', title: 'Premium', isActive: false },
-  { id: '4', title: 'Best Seller', isActive: false },
+  { id: '1', title: 'Tất cả', isActive: true, icon: 'grid-outline' },
+  { id: '2', title: 'Miễn phí', isActive: false, icon: 'gift-outline' },
+  { id: '3', title: 'Premium', isActive: false, icon: 'diamond-outline' },
+  { id: '4', title: 'Bán chạy', isActive: false, icon: 'trending-up-outline' },
 ];
 
-// Dữ liệu mẫu cho tất cả các thẻ
+// All cards data
 const allCards = [
   {
     id: '1',
     name: 'Ocean Theme',
-    price: 302.00,
+    price: 302000,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/35a6f47c-19d1-4226-a30d-c4a74db5a6d7/air-jordan-1-low-shoes-6Q1tFM.png',
     tag: 'BEST SELLER',
     isFavorite: false,
+    rating: 4.8,
+    reviews: 124,
   },
   {
     id: '2',
     name: 'Mountain Theme',
-    price: 752.00,
+    price: 752000,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/756d9f2b-9330-42a0-83bd-823279774574/air-max-excee-shoes-lPbXqt.png',
-    tag: 'BEST SELLER',
+    tag: 'PREMIUM',
     isFavorite: true,
+    rating: 4.9,
+    reviews: 89,
   },
   {
     id: '3',
     name: 'Forest Theme',
-    price: 450.00,
+    price: 450000,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/4f685abe-3cc4-4d43-8c31-71b4fd93d5cd/city-rep-tr-training-shoes-kvsXrM.png',
     tag: 'PREMIUM',
     isFavorite: false,
+    rating: 4.7,
+    reviews: 67,
   },
   {
     id: '4',
     name: 'Sunset Theme',
-    price: 0.00,
+    price: 0,
     image: 'https://static.nike.com/a/images/c_limit,w_400,f_auto/t_product_v1/fa4a93c9-6968-4e0d-8b96-f9eae0bfdba2/dunk-low-shoes-69h36n.png',
     tag: 'FREE',
     isFavorite: false,
+    rating: 4.5,
+    reviews: 203,
   },
 ];
 
-// Hàm định dạng giá VND
+// Price formatting function
 const formatPriceVND = (price: number): string => {
-  if (price === 0) return 'FREE';
-  // Sử dụng toLocaleString để thêm dấu phẩy ngăn cách nghìn và ký hiệu đ ở cuối
-  return `${price.toLocaleString('vi-VN')}đ`;
+  if (price === 0) return 'MIỄN PHÍ';
+  return `${price.toLocaleString('vi-VN')}₫`;
 };
 
 export default function StoreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('1');
   const [favorites, setFavorites] = useState<string[]>(['2']);
-
-  // Danh sách theme và trạng thái tải
   const [themes, setThemes] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [cartCount, setCartCount] = useState<number>(0);
+  const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([]);
+  
+  const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:8000/api/v1';
 
-  // Fetch danh sách theme từ backend
+  // Lấy danh sách theme đã sở hữu
+  const fetchOwnedThemes = async () => {
+    try {
+      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      
+      if (!token) {
+        return; // Không cần làm gì nếu chưa đăng nhập
+      }
+      
+      const response = await axios.get(`${API_URL}/pet-owner/themes/collection`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'device-id': 'vnipet-mobile-app',
+          'app-version': '1.0.0',
+          'platform': 'ios', 
+          'os-version': '14.0',
+          'device-type': 'mobile',
+          'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+        }
+      });
+      
+      // Kiểm tra định dạng response và trích xuất danh sách theme
+      if (response.data && response.data.success) {
+        let themesList = [];
+        
+        // Kiểm tra cấu trúc response
+        if (Array.isArray(response.data.data)) {
+          themesList = response.data.data;
+        } else if (response.data.data && Array.isArray(response.data.data.themes)) {
+          themesList = response.data.data.themes;
+        } else if (response.data.data && Array.isArray(response.data.data.items)) {
+          themesList = response.data.data.items;
+        }
+        
+        // Lưu danh sách ID theme đã sở hữu
+        const themeIds = themesList.map((theme: any) => {
+          if (theme.themeId) {
+            return typeof theme.themeId === 'object' ? theme.themeId._id : theme.themeId;
+          }
+          return theme._id || '';
+        }).filter(Boolean);
+        
+        setOwnedThemeIds(themeIds);
+        console.log('Đã sở hữu themes:', themeIds.length);
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách theme đã sở hữu:', error);
+    }
+  };
+
+  // Lấy danh sách theme đã sở hữu và giỏ hàng
+  useEffect(() => {
+    // Tắt lỗi cảnh báo khi gọi API không thành công
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      // Lọc bỏ log cho các lỗi khi gọi API theme collection
+      if (
+        args[0] && 
+        typeof args[0] === 'string' && 
+        args[0].includes('Lỗi khi lấy danh sách theme đã sở hữu')
+      ) {
+        return;
+      }
+      originalConsoleError(...args);
+    };
+
+    // Gọi API
+    refreshCartBadge();
+    fetchOwnedThemes();
+
+    // Khôi phục console.error khi unmount
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
+
+  // Hàm thêm theme vào giỏ hàng
+  const addToCart = async (themeId: string) => {
+    try {
+      setAddingToCart(themeId);
+      
+      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      // Kiểm tra đã sở hữu chưa
+      if (ownedThemeIds.includes(themeId)) {
+        // Hiển thị thông báo nhẹ nhàng
+        Alert.alert(
+          'Đã sở hữu',
+          'Bạn đã sở hữu theme này rồi!',
+          [{ text: 'Đã hiểu', style: 'default' }]
+        );
+        return;
+      }
+      
+      const response = await axios.post(`${API_URL}/cart/theme/${themeId}`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'device-id': 'vnipet-mobile-app',
+          'app-version': '1.0.0',
+          'platform': 'ios', 
+          'os-version': '14.0',
+          'device-type': 'mobile',
+          'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+        }
+      });
+      
+      if (response.data && response.data.success) {
+        // Cập nhật lại badge giỏ hàng
+        refreshCartBadge();
+        
+        // Hiển thị thông báo thành công
+        Alert.alert(
+          'Thành công',
+          'Đã thêm theme vào giỏ hàng!',
+          [
+            {
+              text: 'Đi đến giỏ hàng',
+              onPress: () => router.push('/cart'),
+            },
+            {
+              text: 'Tiếp tục mua sắm',
+              style: 'cancel',
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Lỗi', response.data.message || 'Không thể thêm theme vào giỏ hàng');
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi thêm vào giỏ hàng:', err);
+      if (err.response?.data?.message === 'Theme đã có trong giỏ hàng') {
+        Alert.alert('Thông báo', 'Theme đã có trong giỏ hàng!');
+      } else {
+        console.log('Lỗi:', err.response?.data?.message || err.message);
+        // Chỉ hiện lỗi khi không phải theme đã sở hữu
+        if (err.response?.data?.message !== 'Bạn đã sở hữu theme này') {
+          Alert.alert('Lỗi', err.response?.data?.message || err.message || 'Có lỗi xảy ra khi thêm vào giỏ hàng');
+        }
+      }
+    } finally {
+      setAddingToCart(null);
+    }
+  };
+
+  // Fetch themes from backend
   useEffect(() => {
     const fetchThemes = async () => {
       try {
@@ -113,7 +309,6 @@ export default function StoreScreen() {
         });
         const data = await response.json();
 
-        // Chuẩn hóa dữ liệu để phù hợp UI hiện tại
         const transformed = Array.isArray(data)
           ? data.map((item: any) => ({
               id: item._id,
@@ -122,6 +317,8 @@ export default function StoreScreen() {
               image: item.imageUrl || '',
               tag: item.price === 0 ? 'FREE' : item.isPremium ? 'PREMIUM' : 'BEST SELLER',
               isFavorite: false,
+              rating: 4.5 + Math.random() * 0.5,
+              reviews: Math.floor(Math.random() * 200) + 50,
             }))
           : [];
 
@@ -137,8 +334,7 @@ export default function StoreScreen() {
     fetchThemes();
   }, []);
 
-  // Phân loại theme
-  const popularCards = themes.slice(0, 2);
+  const popularCardsData = themes.slice(0, 2);
 
   const filterThemesByCategory = () => {
     switch (activeCategory) {
@@ -153,13 +349,15 @@ export default function StoreScreen() {
     }
   };
 
-  const allCards = filterThemesByCategory();
+  const allCardsData = filterThemesByCategory();
 
-  // Hiển thị loader khi đang tải dữ liệu
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#3B82F6" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Đang tải...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -172,45 +370,197 @@ export default function StoreScreen() {
     }
   };
 
+  const navigateToCart = () => {
+    router.push('/cart');
+  };
+
+  // Làm mới badge giỏ hàng
+  async function refreshCartBadge() {
+    try {
+      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      
+      if (!token) {
+        return; // Không cần làm gì nếu chưa đăng nhập
+      }
+      
+      const response = await axios.get(`${API_URL}/cart`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'device-id': 'vnipet-mobile-app',
+          'app-version': '1.0.0',
+          'platform': 'ios', 
+          'os-version': '14.0',
+          'device-type': 'mobile',
+          'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+        }
+      });
+      
+      if (response.data && response.data.success && response.data.data?.items) {
+        console.log('Cart items length:', response.data.data.items.length);
+        setCartCount(response.data.data.items.length);
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy thông tin giỏ hàng:', error);
+    }
+  }
+
+  const renderProductCard = (card: any) => (
+    <TouchableOpacity key={card.id} style={styles.productCard} activeOpacity={0.8}>
+      <View style={styles.productImageContainer}>
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => toggleFavorite(card.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name={favorites.includes(card.id) ? "heart" : "heart-outline"} 
+            size={20} 
+            color={favorites.includes(card.id) ? Colors.error : Colors.text.tertiary} 
+          />
+        </TouchableOpacity>
+        
+        {card.tag && (
+          <View style={[
+            styles.productTag,
+            card.tag === 'FREE' && styles.freeTag,
+            card.tag === 'PREMIUM' && styles.premiumTag,
+            card.tag === 'BEST SELLER' && styles.bestSellerTag,
+          ]}>
+            <Text style={[
+              styles.productTagText,
+              card.tag === 'FREE' && styles.freeTagText,
+              card.tag === 'PREMIUM' && styles.premiumTagText,
+              card.tag === 'BEST SELLER' && styles.bestSellerTagText,
+            ]}>
+              {card.tag === 'FREE' ? 'MIỄN PHÍ' : card.tag}
+            </Text>
+          </View>
+        )}
+        
+
+        
+        <Image 
+          source={{ uri: card.image }} 
+          style={styles.productImage}
+          resizeMode="contain"
+        />
+      </View>
+      
+      <View style={styles.productInfo}>
+        <Text style={styles.productName} numberOfLines={2}>{card.name}</Text>
+        
+        <View style={styles.ratingContainer}>
+          <Ionicons name="star" size={14} color={Colors.warning} />
+          <Text style={styles.ratingText}>{card.rating?.toFixed(1)}</Text>
+          <Text style={styles.reviewsText}>({card.reviews})</Text>
+        </View>
+        
+        <View style={styles.productPriceRow}>
+          <Text style={styles.productPrice}>
+            {formatPriceVND(card.price)}
+          </Text>
+          {ownedThemeIds.includes(card.id) ? (
+            <View style={[styles.addToCartButton, styles.ownedButton]}>
+              <LinearGradient
+                colors={['#10B981', '#059669']}
+                style={styles.addToCartGradient}
+              >
+                <Ionicons name="checkmark" size={20} color="white" />
+              </LinearGradient>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.addToCartButton} 
+              activeOpacity={0.8}
+              onPress={() => addToCart(card.id)}
+              disabled={addingToCart === card.id}
+            >
+              <LinearGradient
+                colors={Colors.gradient.primary}
+                style={styles.addToCartGradient}
+              >
+                {addingToCart === card.id ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Ionicons name="add" size={20} color="white" />
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       
-      {/* Header - Bỏ nút 3 gạch bên trái */}
-      <View style={styles.header}>
-        <View style={styles.headerTitleContainer}>
-          <Ionicons name="storefront-outline" size={24} color="#333" style={styles.headerIcon} />
-          <Text style={styles.headerTitle}>Cửa Hàng</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.cartButton}>
-            <Ionicons name="cart-outline" size={28} color="#333" />
-            <View style={styles.cartBadge} />
+      {/* Modern Header */}
+      <LinearGradient
+        colors={Colors.gradient.secondary}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerTitleContainer}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="storefront" size={24} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Cửa Hàng</Text>
+              <Text style={styles.headerSubtitle}>Khám phá theme mới</Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.cartButton} 
+            onPress={navigateToCart}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cartIconContainer}>
+              <Ionicons name="bag-outline" size={24} color={Colors.text.primary} />
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
       
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-        {/* Search Bar */}
+        {/* Enhanced Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <Ionicons name="search" size={20} color={Colors.text.tertiary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Looking for themes"
-              placeholderTextColor="#999"
+              placeholder="Tìm kiếm theme..."
+              placeholderTextColor={Colors.text.tertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
           </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <MaterialIcons name="tune" size={24} color="white" />
+          <TouchableOpacity style={styles.filterButton} activeOpacity={0.8}>
+            <LinearGradient
+              colors={Colors.gradient.primary}
+              style={styles.filterGradient}
+            >
+              <MaterialIcons name="tune" size={22} color="white" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
         
-        {/* Categories - Đổi thành 4 mục mới */}
+        {/* Enhanced Categories */}
         <View style={styles.categorySection}>
-          <Text style={styles.sectionTitle}>Select Category</Text>
+          <Text style={styles.sectionTitle}>Danh mục</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
@@ -224,7 +574,14 @@ export default function StoreScreen() {
                   activeCategory === category.id && styles.activeCategoryItem
                 ]}
                 onPress={() => setActiveCategory(category.id)}
+                activeOpacity={0.8}
               >
+                <Ionicons 
+                  name={category.icon as any} 
+                  size={18} 
+                  color={activeCategory === category.id ? 'white' : Colors.text.secondary}
+                  style={styles.categoryIcon}
+                />
                 <Text style={[
                   styles.categoryText,
                   activeCategory === category.id && styles.activeCategoryText
@@ -236,122 +593,80 @@ export default function StoreScreen() {
           </ScrollView>
         </View>
         
-        {/* Popular Cards - Đổi từ "Popular Shoes" sang "Popular Cards" */}
+        {/* Popular Cards */}
         <View style={styles.productSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Popular Cards</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See all</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Theme phổ biến</Text>
+              <Text style={styles.sectionSubtitle}>Được yêu thích nhất</Text>
+            </View>
+            <TouchableOpacity style={styles.seeAllButton}>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
             </TouchableOpacity>
           </View>
           
           <View style={styles.productsGrid}>
-            {popularCards.map(card => (
-              <View key={card.id} style={styles.productCard}>
-                <View style={styles.productImageContainer}>
-                  <TouchableOpacity
-                    style={styles.favoriteButton}
-                    onPress={() => toggleFavorite(card.id)}
-                  >
-                    <Ionicons 
-                      name={favorites.includes(card.id) ? "heart" : "heart-outline"} 
-                      size={22} 
-                      color={favorites.includes(card.id) ? "#FF6B6B" : "#777"} 
-                    />
-                  </TouchableOpacity>
-                  <Image 
-                    source={{ uri: card.image }} 
-                    style={styles.productImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                
-                <View style={styles.productInfo}>
-                  <Text style={styles.productTag}>{card.tag}</Text>
-                  <Text style={styles.productName}>{card.name}</Text>
-                  <View style={styles.productPriceRow}>
-                    <Text style={styles.productPrice}>
-                      {formatPriceVND(card.price)}
-                    </Text>
-                    <TouchableOpacity style={styles.addToCartButton}>
-                      <Ionicons name="add" size={24} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
+            {popularCardsData.length > 0 ? (
+              popularCardsData.map(renderProductCard)
+            ) : (
+              <Text style={styles.noDataText}>Chưa có theme</Text>
+            )}
           </View>
         </View>
         
-        {/* New Arrivals - Thay đổi hiển thị thành dạng dài liền nhau */}
+        {/* Enhanced New Arrivals Banner */}
         <View style={styles.productSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>New Arrivals</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
+            <View>
+              <Text style={styles.sectionTitle}>Ưu đãi đặc biệt</Text>
+              <Text style={styles.sectionSubtitle}>Chỉ trong tuần này</Text>
+            </View>
           </View>
           
-          {/* Thay đổi hiển thị thành dạng dài theo hàng ngang */}
-          <View style={styles.newArrivalBanner}>
-            <View style={styles.sparkleContainer}>
-              <Text style={styles.sparkleEmoji}>✨</Text>
-            </View>
-            <View style={styles.saleContent}>
-              <Text style={styles.saleTitle}>Summer Sale</Text>
-              <Text style={styles.saleDiscount}>15% OFF</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.promotionBanner} activeOpacity={0.9}>
+            <LinearGradient
+              colors={['#FF6B6B', '#FF8E8E']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.promotionGradient}
+            >
+              <View style={styles.promotionContent}>
+                <View style={styles.promotionTextContainer}>
+                  <Text style={styles.promotionTitle}>Giảm giá mùa hè</Text>
+                  <Text style={styles.promotionDiscount}>15% OFF</Text>
+                  <Text style={styles.promotionDescription}>Cho tất cả theme premium</Text>
+                </View>
+                <View style={styles.promotionIconContainer}>
+                  <Text style={styles.promotionEmoji}>🔥</Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
         
-        {/* All Cards - Thêm mục mới */}
+        {/* All Cards */}
         <View style={styles.productSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>All Cards</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See all</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Tất cả theme</Text>
+              <Text style={styles.sectionSubtitle}>{allCardsData.length} sản phẩm</Text>
+            </View>
+            <TouchableOpacity style={styles.seeAllButton}>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
             </TouchableOpacity>
           </View>
           
           <View style={styles.productsGrid}>
-            {allCards.map(card => (
-              <View key={card.id} style={styles.productCard}>
-                <View style={styles.productImageContainer}>
-                  <TouchableOpacity
-                    style={styles.favoriteButton}
-                    onPress={() => toggleFavorite(card.id)}
-                  >
-                    <Ionicons 
-                      name={favorites.includes(card.id) ? "heart" : "heart-outline"} 
-                      size={22} 
-                      color={favorites.includes(card.id) ? "#FF6B6B" : "#777"} 
-                    />
-                  </TouchableOpacity>
-                  <Image 
-                    source={{ uri: card.image }} 
-                    style={styles.productImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                
-                <View style={styles.productInfo}>
-                  <Text style={styles.productTag}>{card.tag}</Text>
-                  <Text style={styles.productName}>{card.name}</Text>
-                  <View style={styles.productPriceRow}>
-                    <Text style={styles.productPrice}>
-                      {formatPriceVND(card.price)}
-                    </Text>
-                    <TouchableOpacity style={styles.addToCartButton}>
-                      <Ionicons name="add" size={24} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
+            {allCardsData.length > 0 ? (
+              allCardsData.map(renderProductCard)
+            ) : (
+              <Text style={styles.noDataText}>Chưa có theme</Text>
+            )}
           </View>
         </View>
         
-        {/* Bottom spacer for nav bar */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
@@ -361,51 +676,86 @@ export default function StoreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: Colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 16,
+    color: Colors.text.secondary,
+    marginTop: 12,
   },
   header: {
+    paddingTop: Platform.OS === 'ios' ? 0 : 10,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    paddingVertical: 16,
   },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerIcon: {
-    marginRight: 8,
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerTitle: {
     fontFamily: Fonts.SFProDisplay.bold,
-    fontSize: 18,
-    color: '#333',
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 22,
+    color: Colors.text.primary,
+    lineHeight: 28,
   },
-  headerRight: {
-    width: 40,
-    alignItems: 'flex-end',
+  headerSubtitle: {
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginTop: 2,
   },
   cartButton: {
+    padding: 8,
+  },
+  cartIconContainer: {
     position: 'relative',
-    height: 40,
     width: 40,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   cartBadge: {
     position: 'absolute',
-    top: 3,
-    right: 3,
-    backgroundColor: '#FF3B30',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: -2,
+    right: -2,
+    backgroundColor: Colors.error,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  cartBadgeText: {
+    fontFamily: Fonts.SFProText.bold,
+    fontSize: 10,
+    color: 'white',
   },
   scrollView: {
     flex: 1,
@@ -413,81 +763,117 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom: 24,
     alignItems: 'center',
   },
   searchBar: {
     flex: 1,
-    height: 50,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 25,
+    height: 52,
+    backgroundColor: Colors.surface,
+    borderRadius: 26,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
     fontFamily: Fonts.SFProText.regular,
     fontSize: 16,
+    color: Colors.text.primary,
   },
   filterButton: {
-    backgroundColor: '#3B82F6',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    borderRadius: 26,
+  },
+  filterGradient: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
   },
   categorySection: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 28,
   },
   sectionTitle: {
-    fontFamily: Fonts.SFProDisplay.medium,
-    fontSize: 18,
-    color: '#333',
-    marginBottom: 15,
+    fontFamily: Fonts.SFProDisplay.bold,
+    fontSize: 20,
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginBottom: 16,
   },
   categoriesContainer: {
     paddingRight: 20,
   },
   categoryItem: {
-    paddingHorizontal: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 25,
-    backgroundColor: '#F5F5F5',
-    marginRight: 10,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   activeCategoryItem: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.3,
+  },
+  categoryIcon: {
+    marginRight: 8,
   },
   categoryText: {
-    fontFamily: Fonts.SFProText.regular,
-    fontSize: 15,
-    color: '#333',
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 14,
+    color: Colors.text.secondary,
   },
   activeCategoryText: {
     color: 'white',
   },
   productSection: {
     paddingHorizontal: 20,
-    marginBottom: 25,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 20,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
   },
   seeAllText: {
-    fontFamily: Fonts.SFProText.regular,
+    fontFamily: Fonts.SFProText.medium,
     fontSize: 14,
-    color: '#3B82F6',
+    color: Colors.primary,
+    marginRight: 4,
   },
   productsGrid: {
     flexDirection: 'row',
@@ -496,44 +882,104 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: itemWidth,
-    marginBottom: 15,
-    borderRadius: 16,
-    backgroundColor: 'white',
+    marginBottom: 20,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: Colors.border,
     overflow: 'hidden',
   },
   productImageContainer: {
-    height: 150,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 10,
+    height: 160,
+    backgroundColor: Colors.secondary,
     position: 'relative',
+    padding: 16,
   },
   favoriteButton: {
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  productTag: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  freeTag: {
+    backgroundColor: Colors.success,
+  },
+  premiumTag: {
+    backgroundColor: Colors.primary,
+  },
+  bestSellerTag: {
+    backgroundColor: Colors.warning,
+  },
+  productTagText: {
+    fontFamily: Fonts.SFProText.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  freeTagText: {
+    color: 'white',
+  },
+  premiumTagText: {
+    color: 'white',
+  },
+  bestSellerTagText: {
+    color: 'white',
   },
   productImage: {
     width: '100%',
     height: '100%',
   },
   productInfo: {
-    paddingTop: 10,
-  },
-  productTag: {
-    fontFamily: Fonts.SFProText.regular,
-    fontSize: 11,
-    color: '#3B82F6',
-    marginBottom: 5,
+    padding: 16,
   },
   productName: {
-    fontFamily: Fonts.SFProDisplay.medium,
-    fontSize: 15,
-    color: '#333',
+    fontFamily: Fonts.SFProDisplay.semibold,
+    fontSize: 16,
+    color: Colors.text.primary,
     marginBottom: 8,
+    lineHeight: 22,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ratingText: {
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 13,
+    color: Colors.text.primary,
+    marginLeft: 4,
+  },
+  reviewsText: {
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 13,
+    color: Colors.text.tertiary,
+    marginLeft: 4,
   },
   productPriceRow: {
     flexDirection: 'row',
@@ -541,53 +987,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   productPrice: {
-    fontFamily: Fonts.SFProDisplay.medium,
-    fontSize: 16,
-    color: '#333',
+    fontFamily: Fonts.SFProDisplay.bold,
+    fontSize: 18,
+    color: Colors.text.primary,
   },
   addToCartButton: {
-    backgroundColor: '#3B82F6',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    borderRadius: 20,
+  },
+  addToCartGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  /* Thay đổi style cho New Arrivals (dạng banner ngang) */
-  newArrivalBanner: {
-    width: '100%',
-    height: 140,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 16,
-    padding: 20,
-    position: 'relative',
+  promotionBanner: {
+    borderRadius: 20,
     overflow: 'hidden',
+  },
+  promotionGradient: {
+    padding: 24,
+    minHeight: 120,
+  },
+  promotionContent: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  sparkleContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  sparkleEmoji: {
-    fontSize: 20,
-  },
-  saleContent: {
+  promotionTextContainer: {
     flex: 1,
   },
-  saleTitle: {
-    fontFamily: Fonts.SFProText.regular,
-    fontSize: 15,
-    color: '#333',
+  promotionTitle: {
+    fontFamily: Fonts.SFProText.medium,
+    fontSize: 16,
+    color: 'white',
+    marginBottom: 4,
   },
-  saleDiscount: {
-    fontFamily: Fonts.SFProDisplay.medium,
+  promotionDiscount: {
+    fontFamily: Fonts.SFProDisplay.bold,
     fontSize: 32,
-    color: '#6366F1',
-    marginTop: 10,
+    color: 'white',
+    marginBottom: 4,
+  },
+  promotionDescription: {
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  promotionIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promotionEmoji: {
+    fontSize: 28,
   },
   bottomSpacer: {
     height: 100,
   },
-}); 
+  noDataText: {
+    fontFamily: Fonts.SFProText.regular,
+    fontSize: 16,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  ownedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 0,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  ownedButton: {
+    opacity: 0.7,
+  },
+});

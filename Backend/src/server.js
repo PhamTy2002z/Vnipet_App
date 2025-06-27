@@ -37,6 +37,8 @@ const mobileAuthRoutes = require('./routes/mobileAuth'); // <-- mobile auth with
 const iosMediaRoutes = require('./routes/ios-media');    // <-- iOS media handling
 const mediaRoutes  = require('./routes/media');         // <-- Media handling (images, videos)
 const qrRoutes = require('./routes/qr-new');           // <-- QR code và analytics
+const cartRoutes  = require('./routes/cart');          // <-- theme cart routes
+const orderRoutes = require('./routes/order');         // <-- purchase history routes
 const { startReminderJob, startTokenCleanupJob } = require('./utils/scheduler');
 
 // Đảm bảo NODE_ENV được đặt
@@ -284,6 +286,8 @@ const createApp = () => {
   app.use('/api/v1/ios', iosMediaRoutes);
   app.use('/api/v1/media', mediaRoutes);
   app.use('/api/v1/qr', qrRoutes);
+  app.use('/api/v1/cart', cartRoutes);
+  app.use('/api/v1/orders', orderRoutes);
   app.use('/api/v1', commonRoutes);
 
   /* ---------- 9. Error Handling ------------------------------------------ */

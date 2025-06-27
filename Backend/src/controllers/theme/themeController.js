@@ -7,6 +7,7 @@ const Theme = require('../../models/Theme');
 const UserTheme = require('../../models/UserTheme');
 const User = require('../../models/PetOwnerUser');
 const Pet = require('../../models/Pet');
+const ThemeOrder = require('../../models/ThemeOrder');
 
 /**
  * Get all themes for store
@@ -211,10 +212,25 @@ exports.purchaseTheme = async (req, res) => {
       previewUrl = theme.imageUrl;
     }
     
+    // Tạo hoá đơn mới (1 sản phẩm)
+    const order = await ThemeOrder.create({
+      userId,
+      items: [{
+        themeId: theme._id,
+        userThemeId: userTheme._id,
+        price: theme.price,
+        name: theme.name,
+      }],
+      totalPrice: theme.price || 0,
+      transactionId: txId,
+      purchaseDate: new Date(),
+    });
+    
     res.status(201).json({
       success: true,
       message: 'Theme purchased successfully',
       data: {
+        order,
         userThemeId: userTheme._id,
         themeId: theme._id,
         name: theme.name,
