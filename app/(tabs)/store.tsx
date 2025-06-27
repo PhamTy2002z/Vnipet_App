@@ -2,24 +2,25 @@ import { API_BASE_URL, DEFAULT_HEADERS } from '@/api/config/apiConfig';
 import { Fonts } from '@/constants/Fonts';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 // Screen dimensions
@@ -222,12 +223,21 @@ export default function StoreScreen() {
     };
   }, []);
 
+  // Tự động làm mới giỏ hàng mỗi khi screen được focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[STORE] Screen focused, refreshing cart badge');
+      refreshCartBadge();
+    }, [])
+  );
+
   // Hàm thêm theme vào giỏ hàng
   const addToCart = async (themeId: string) => {
     try {
       setAddingToCart(themeId);
       
       const token = await AsyncStorage.getItem('@vnipet_access_token');
+      console.log('[ADD] Thêm theme vào giỏ hàng, themeId =', themeId);
       
       if (!token) {
         router.push('/login');
@@ -259,9 +269,11 @@ export default function StoreScreen() {
         }
       });
       
+      console.log('[ADD] Response:', JSON.stringify(response.data, null, 2));
+      
       if (response.data && response.data.success) {
         // Cập nhật lại badge giỏ hàng
-        refreshCartBadge();
+        await refreshCartBadge();
         
         // Hiển thị thông báo thành công
         Alert.alert(
@@ -270,7 +282,36 @@ export default function StoreScreen() {
           [
             {
               text: 'Đi đến giỏ hàng',
-              onPress: () => router.push('/cart'),
+              onPress: async () => {
+                // Đảm bảo làm mới giỏ hàng trước khi chuyển hướng
+                try {
+                  // Gọi API refreshCart một lần nữa để đảm bảo dữ liệu mới nhất
+                  const refreshResponse = await axios.get(`${API_URL}/cart/refresh`, {
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                      'device-id': 'vnipet-mobile-app',
+                      'app-version': '1.0.0',
+                      'platform': 'ios', 
+                      'os-version': '14.0',
+                      'device-type': 'mobile',
+                      'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+                    }
+                  });
+
+                  console.log('[PRE-NAVIGATION] Cart refresh response:', 
+                    refreshResponse.data?.success, 
+                    'items:', refreshResponse.data?.data?.items?.length || 0
+                  );
+                } catch (err) {
+                  console.error('[PRE-NAVIGATION] Error refreshing cart:', err);
+                }
+                
+                // Thêm timestamp để đảm bảo Cart luôn được refresh khi mở
+                const ts = new Date().getTime();
+                router.push({ pathname: '/cart', params: { ts, forceRefresh: 'true' } });
+              },
             },
             {
               text: 'Tiếp tục mua sắm',
@@ -301,28 +342,40 @@ export default function StoreScreen() {
   useEffect(() => {
     const fetchThemes = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/store/themes`, {
-          method: 'GET',
+        setLoading(true);
+
+        const response = await axios.get(`${API_BASE_URL}/pet-owner/store/themes`, {
           headers: {
             ...DEFAULT_HEADERS,
           },
         });
-        const data = await response.json();
 
-        const transformed = Array.isArray(data)
-          ? data.map((item: any) => ({
+        /*
+         * Backend trả về {
+         *   success: true,
+         *   data: [ { _id, name, price, imageUrl, image, isPremium, inStore, ... } ]
+         * }
+         */
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          const transformed = response.data.data.map((item: any) => {
+            // Ưu tiên image.publicUrl nếu có
+            const imageUrl = item.image?.publicUrl || item.imageUrl || '';
+            return {
               id: item._id,
               name: item.name,
               price: item.price || 0,
-              image: item.imageUrl || '',
+              image: imageUrl,
               tag: item.price === 0 ? 'FREE' : item.isPremium ? 'PREMIUM' : 'BEST SELLER',
               isFavorite: false,
               rating: 4.5 + Math.random() * 0.5,
               reviews: Math.floor(Math.random() * 200) + 50,
-            }))
-          : [];
-
-        setThemes(transformed);
+            };
+          });
+          setThemes(transformed);
+        } else {
+          console.log('fetchThemes: Response không hợp lệ', response.data);
+          Alert.alert('Lỗi', 'Không thể tải danh sách theme. Vui lòng thử lại sau.');
+        }
       } catch (error) {
         console.error('Lỗi tải theme:', error);
         Alert.alert('Lỗi', 'Không thể tải danh sách theme. Vui lòng thử lại sau.');
@@ -370,8 +423,38 @@ export default function StoreScreen() {
     }
   };
 
-  const navigateToCart = () => {
-    router.push('/cart');
+  const navigateToCart = async () => {
+    // Làm mới giỏ hàng trước khi chuyển hướng
+    const token = await AsyncStorage.getItem('@vnipet_access_token');
+    if (token) {
+      try {
+        // Gọi API refreshCart để đảm bảo dữ liệu mới nhất
+        const response = await axios.get(`${API_URL}/cart/refresh`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'device-id': 'vnipet-mobile-app',
+            'app-version': '1.0.0',
+            'platform': 'ios', 
+            'os-version': '14.0',
+            'device-type': 'mobile',
+            'User-Agent': 'VnipetApp/1.0 iOS/14.0',
+          }
+        });
+
+        console.log('[NAV TO CART] Cart refresh response:', 
+          response.data?.success, 
+          'items:', response.data?.data?.items?.length || 0
+        );
+      } catch (err) {
+        console.error('[NAV TO CART] Error refreshing cart:', err);
+      }
+    }
+    
+    // Thêm timestamp để đảm bảo Cart luôn được refresh khi mở
+    const ts = new Date().getTime();
+    router.push({ pathname: '/cart', params: { ts, forceRefresh: 'true' } });
   };
 
   // Làm mới badge giỏ hàng
@@ -383,7 +466,7 @@ export default function StoreScreen() {
         return; // Không cần làm gì nếu chưa đăng nhập
       }
       
-      const response = await axios.get(`${API_URL}/cart`, {
+      const response = await axios.get(`${API_URL}/cart/refresh`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

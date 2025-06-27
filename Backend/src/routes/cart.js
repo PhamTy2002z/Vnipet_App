@@ -11,6 +11,9 @@ router.use(authPetOwnerMiddleware);
 // Lấy giỏ hàng
 router.get('/', wrap(cartController.getCart));
 
+// API làm mới giỏ hàng cho mobile app
+router.get('/refresh', wrap(cartController.refreshCart));
+
 // Thêm theme vào giỏ
 router.post('/theme/:themeId', wrap(cartController.addThemeToCart));
 

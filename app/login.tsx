@@ -5,8 +5,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { authService } from '../api/services/authService';
-import { getDeviceInfo } from '../api/utils/deviceUtils';
+import { useUser } from '../contexts/UserContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,6 +15,9 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Sử dụng context
+  const { signIn, getDeviceId, isLoading: contextLoading } = useUser();
   
   useEffect(() => {
     // Kiểm tra xem có thông tin đăng nhập đã lưu hay không
@@ -54,16 +56,12 @@ export default function LoginScreen() {
     try {
       setIsLoading(true);
 
-      // Lấy thông tin thiết bị
-      const deviceInfo = await getDeviceInfo();
+      // Lấy device ID 
+      const deviceId = await getDeviceId();
       
-      // Gọi API đăng nhập
-      const result = await authService.login(email, password);
-      
-      if (result.success) {
-        // Kiểm tra token sau khi đăng nhập
-        const savedToken = await AsyncStorage.getItem('@vnipet_access_token');
-        console.log('Token sau khi đăng nhập:', savedToken ? 'Đã lưu token' : 'Chưa lưu token');
+      // Gọi API đăng nhập từ context
+      try {
+        const result = await signIn(email, password, deviceId);
         
         // Lưu thông tin "Remember me" nếu được tích chọn
         if (rememberMe) {
@@ -78,11 +76,12 @@ export default function LoginScreen() {
         // Đăng nhập thành công
         console.log('Đăng nhập thành công:', result.user);
         router.replace('/(tabs)');
-      } else {
+      } catch (error: any) {
         // Đăng nhập thất bại
-        Alert.alert('Đăng nhập thất bại', result.message || 'Vui lòng kiểm tra email và mật khẩu');
+        console.error('Lỗi khi đăng nhập:', error);
+        Alert.alert('Đăng nhập thất bại', error.message || 'Vui lòng kiểm tra email và mật khẩu');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       Alert.alert('Lỗi đăng nhập', 'Đã có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.');
     } finally {
@@ -176,11 +175,11 @@ export default function LoginScreen() {
                 </View>
 
                 <TouchableOpacity 
-                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+                  style={[styles.loginButton, (isLoading || contextLoading) && styles.loginButtonDisabled]} 
                   onPress={handleLogin}
-                  disabled={isLoading}
+                  disabled={isLoading || contextLoading}
                 >
-                  {isLoading ? (
+                  {(isLoading || contextLoading) ? (
                     <ActivityIndicator color="#FFF" size="small" />
                   ) : (
                     <Text style={styles.loginButtonText}>Log In</Text>

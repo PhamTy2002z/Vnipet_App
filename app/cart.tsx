@@ -1,8 +1,9 @@
 import { Fonts } from '@/constants/Fonts';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -45,8 +46,32 @@ export default function ShoppingCart() {
   const [error, setError] = useState<string | null>(null);
   const [processingCheckout, setProcessingCheckout] = useState<boolean>(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [tokenReady, setTokenReady] = useState<boolean>(false);
+  
+  // Lấy params từ URL để biết có cần làm mới dữ liệu không
+  const params = useLocalSearchParams<{ ts: string; forceRefresh: string }>();
+  const forceRefresh = params.forceRefresh === 'true';
+  const timestamp = params.ts; // Sử dụng để phát hiện khi nào trang được mở mới
 
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:8000/api/v1';
+
+  // Lấy token khi component mount
+  useEffect(() => {
+    const loadToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem('@vnipet_access_token');
+        console.log('[CART] Token loaded:', token ? `${token.substring(0, 15)}...` : 'null');
+        setAuthToken(token);
+        setTokenReady(true);
+      } catch (err) {
+        console.error('[CART] Error loading token:', err);
+        setTokenReady(true); // Vẫn đánh dấu là đã sẵn sàng để tiếp tục
+      }
+    };
+    
+    loadToken();
+  }, []);
 
   // Hàm lấy giỏ hàng từ API
   const fetchCart = async () => {
@@ -54,14 +79,19 @@ export default function ShoppingCart() {
       setLoading(true);
       setError(null);
 
-      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      // Sử dụng token đã lưu trong state
+      const token = authToken;
+      console.log('[CART] Fetching cart with token:', token ? `${token.substring(0, 15)}...` : 'null');
+      console.log('[CART] Timestamp:', timestamp, 'ForceRefresh:', forceRefresh);
       
       if (!token) {
+        console.log('[CART] No token, redirecting to login');
         router.replace('/login');
         return;
       }
 
-      const response = await axios.get(`${API_URL}/cart`, {
+      // Sử dụng API refresh giỏ hàng mới
+      const response = await axios.get(`${API_URL}/cart/refresh`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -72,27 +102,30 @@ export default function ShoppingCart() {
           'os-version': '14.0',
           'device-type': 'mobile',
           'User-Agent': 'VnipetApp/1.0 iOS/14.0',
-        }
+          // Thêm cache buster para
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        // Ngăn chặn cache ở client bằng cách thêm tham số ngẫu nhiên
+        params: { _nocache: new Date().getTime() }
       });
 
-      console.log('Cart API Response:', JSON.stringify(response.data, null, 2));
-      // Debug more detailed information
-      console.log('Cart items length:', response.data?.data?.items?.length);
-      console.log('Cart data structure:', JSON.stringify({
-        hasData: !!response.data,
-        hasSuccess: response.data?.success,
-        hasItems: !!response.data?.data?.items,
-        itemsIsArray: Array.isArray(response.data?.data?.items),
-        firstItem: response.data?.data?.items?.[0],
-      }, null, 2));
+      console.log('[CART] API Response:', JSON.stringify(response.data, null, 2));
+      console.log('[CART] Items count:', response.data?.data?.items?.length || 0);
+      if (response.data?.data?.items?.length > 0) {
+        console.log('[CART] First item:', JSON.stringify(response.data?.data?.items[0], null, 2));
+      }
 
       if (response.data && response.data.success) {
+        console.log('[CART] Setting cart data with', response.data.data.items.length, 'items');
         setCart(response.data.data);
       } else {
+        console.log('[CART] API returned success=false or invalid data');
         setError('Không thể tải thông tin giỏ hàng');
       }
     } catch (err: any) {
-      console.error('Lỗi khi tải giỏ hàng:', err);
+      console.error('[CART] Error fetching cart:', err);
       setError(err.message || 'Có lỗi xảy ra khi tải giỏ hàng');
     } finally {
       setLoading(false);
@@ -103,10 +136,13 @@ export default function ShoppingCart() {
   const removeFromCart = async (themeId: string) => {
     try {
       setRemovingItemId(themeId);
+      console.log('[CART] Removing item:', themeId);
 
-      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      // Sử dụng token đã lưu trong state
+      const token = authToken;
       
       if (!token) {
+        console.log('[CART] No token for remove, redirecting to login');
         router.replace('/login');
         return;
       }
@@ -122,17 +158,31 @@ export default function ShoppingCart() {
           'os-version': '14.0',
           'device-type': 'mobile',
           'User-Agent': 'VnipetApp/1.0 iOS/14.0',
-        }
+          // Thêm cache control headers
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        params: { _nocache: new Date().getTime() }
       });
 
+      console.log('[CART] Remove response:', JSON.stringify(response.data, null, 2));
+
       if (response.data && response.data.success) {
-        // Cập nhật giỏ hàng
+        // Cập nhật giỏ hàng ngay lập tức
+        console.log('[CART] Item removed successfully, updating cart');
         setCart(response.data.data);
+        
+        // Gọi lại fetchCart ngay lập tức để đồng bộ giỏ hàng
+        setTimeout(() => {
+          fetchCart();
+        }, 300);
       } else {
+        console.log('[CART] Failed to remove item:', response.data?.message);
         Alert.alert('Lỗi', response.data.message || 'Không thể xóa theme khỏi giỏ hàng');
       }
     } catch (err: any) {
-      console.error('Lỗi khi xóa theme khỏi giỏ hàng:', err);
+      console.error('[CART] Error removing item:', err);
       Alert.alert('Lỗi', err.message || 'Có lỗi xảy ra khi xóa theme khỏi giỏ hàng');
     } finally {
       setRemovingItemId(null);
@@ -143,10 +193,13 @@ export default function ShoppingCart() {
   const checkout = async () => {
     try {
       setProcessingCheckout(true);
+      console.log('[CART] Processing checkout');
 
-      const token = await AsyncStorage.getItem('@vnipet_access_token');
+      // Sử dụng token đã lưu trong state
+      const token = authToken;
       
       if (!token) {
+        console.log('[CART] No token for checkout, redirecting to login');
         router.replace('/login');
         return;
       }
@@ -165,7 +218,10 @@ export default function ShoppingCart() {
         }
       });
 
+      console.log('[CART] Checkout response:', JSON.stringify(response.data, null, 2));
+
       if (response.data && response.data.success) {
+        console.log('[CART] Checkout successful');
         Alert.alert(
           'Thanh toán thành công',
           'Cảm ơn bạn đã mua theme!',
@@ -184,10 +240,11 @@ export default function ShoppingCart() {
         // Refresh cart after checkout
         fetchCart();
       } else {
+        console.log('[CART] Checkout failed:', response.data?.message);
         Alert.alert('Lỗi', response.data.message || 'Không thể hoàn tất thanh toán');
       }
     } catch (err: any) {
-      console.error('Lỗi khi thanh toán:', err);
+      console.error('[CART] Checkout error:', err);
       Alert.alert('Lỗi', err.response?.data?.message || err.message || 'Có lỗi xảy ra khi thanh toán');
     } finally {
       setProcessingCheckout(false);
@@ -256,10 +313,29 @@ export default function ShoppingCart() {
     return `${price.toLocaleString('vi-VN')}đ`;
   };
 
-  // Tải giỏ hàng khi component mount
+  // Chỉ fetch khi token đã sẵn sàng
   useEffect(() => {
-    fetchCart();
-  }, []);
+    if (tokenReady) {
+      console.log('[CART] Token ready, fetching cart');
+      fetchCart();
+    }
+  }, [tokenReady]);
+
+  // Luôn làm mới giỏ hàng mỗi khi màn hình được focus hoặc khi timestamp/forceRefresh thay đổi
+  useFocusEffect(
+    React.useCallback(() => {
+      // Chỉ fetch khi token đã sẵn sàng
+      if (tokenReady) {
+        console.log('[CART] Screen focused or params changed, refreshing cart');
+        console.log('[CART] Timestamp:', timestamp, 'ForceRefresh:', forceRefresh);
+        fetchCart();
+      }
+      
+      return () => {
+        // Cleanup nếu cần
+      };
+    }, [tokenReady, timestamp, forceRefresh]) // Phụ thuộc vào timestamp và forceRefresh
+  );
 
   // Tổng số sản phẩm
   const totalItems = cart.items.length;

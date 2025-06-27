@@ -7,6 +7,67 @@ const DeviceRegistry = require('../../models/DeviceRegistry');
 const RefreshToken = require('../../models/RefreshToken');
 const User = require('../../models/PetOwnerUser');
 const tokenManager = require('../../utils/tokenManager');
+const ThemeCart = require('../../models/ThemeCart');
+
+/**
+ * Helper: Format dữ liệu giỏ hàng cho response
+ */
+async function getFormattedCart(userId) {
+  try {
+    // Lấy giỏ hàng hiện tại của người dùng
+    const cart = await ThemeCart.findOne({ userId })
+      .populate({ path: 'items.themeId', select: 'name description price imageUrl image isPremium inStore isActive' });
+    
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return { items: [], totalPrice: 0 };
+    }
+    
+    // Chuyển cart thành object
+    const cartData = cart.toObject();
+    
+    // Format từng item
+    cartData.items = cartData.items.map(item => {
+      if (!item.themeId) {
+        return { ...item, imageUrl: null, theme: null };
+      }
+      
+      const imageUrl = item.themeId.image?.publicUrl || item.themeId.imageUrl || null;
+      
+      return {
+        ...item,
+        imageUrl,
+        theme: {
+          _id: item.themeId._id,
+          name: item.themeId.name,
+          price: item.themeId.price || 0,
+          description: item.themeId.description,
+          isPremium: item.themeId.isPremium,
+          inStore: item.themeId.inStore,
+          isActive: item.themeId.isActive,
+          imageUrl,
+        },
+      };
+    });
+
+    // Tính tổng giá
+    const totalPrice = cartData.items.reduce((acc, item) => {
+      if (item.theme && item.theme.isPremium) {
+        return acc + (item.theme.price || 0);
+      }
+      return acc;
+    }, 0);
+
+    return {
+      items: cartData.items,
+      totalPrice,
+      _id: cartData._id,
+      userId: cartData.userId,
+    };
+  } catch (error) {
+    console.error('[GET CART] Error:', error);
+    return { items: [], totalPrice: 0 };
+  }
+}
 
 /**
  * Register a new user with mobile device
@@ -342,6 +403,9 @@ exports.mobileLogin = async (req, res) => {
       deviceInfo
     );
 
+    // Lấy thông tin giỏ hàng hiện tại
+    const cart = await getFormattedCart(user._id);
+
     return res.json({
       success: true,
       user: {
@@ -362,6 +426,7 @@ exports.mobileLogin = async (req, res) => {
         deviceId: device.deviceId,
         trustScore: device.trustScore || 0
       },
+      cart: cart,
       message: 'Đăng nhập thành công'
     });
     
@@ -459,6 +524,9 @@ exports.refreshToken = async (req, res) => {
       device.deviceInfo
     );
 
+    // Lấy thông tin giỏ hàng hiện tại
+    const cart = await getFormattedCart(user._id);
+
     return res.json({
       success: true,
       tokens: {
@@ -466,6 +534,13 @@ exports.refreshToken = async (req, res) => {
         refreshToken: tokens.refreshToken,
         expiresIn: tokens.expiresIn,
         refreshExpiresAt: tokens.refreshExpiresAt
+      },
+      cart: cart,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone
       }
     });
   } catch (error) {
