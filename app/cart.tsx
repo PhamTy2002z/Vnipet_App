@@ -173,6 +173,13 @@ export default function ShoppingCart() {
         console.log('[CART] Item removed successfully, updating cart');
         setCart(response.data.data);
         
+        // Lưu số lượng sản phẩm mới vào AsyncStorage để đồng bộ với badge trên trang Store
+        const newCartCount = response.data.data?.items?.length || 0;
+        console.log('[CART] New cart count after remove:', newCartCount);
+        
+        // Lưu vào AsyncStorage để các màn hình khác có thể truy cập
+        await AsyncStorage.setItem('@vnipet_cart_count', newCartCount.toString());
+        
         // Gọi lại fetchCart ngay lập tức để đồng bộ giỏ hàng
         setTimeout(() => {
           fetchCart();
@@ -222,6 +229,10 @@ export default function ShoppingCart() {
 
       if (response.data && response.data.success) {
         console.log('[CART] Checkout successful');
+        
+        // Đặt lại số lượng sản phẩm trong giỏ hàng về 0 và lưu vào AsyncStorage
+        await AsyncStorage.setItem('@vnipet_cart_count', '0');
+        
         Alert.alert(
           'Thanh toán thành công',
           'Cảm ơn bạn đã mua theme!',

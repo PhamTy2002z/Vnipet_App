@@ -1,4 +1,5 @@
 import { API_BASE_URL, DEFAULT_HEADERS } from '@/api/config/apiConfig';
+import Toast from '@/components/ui/Toast';
 import { Fonts } from '@/constants/Fonts';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -143,6 +144,12 @@ export default function StoreScreen() {
   const [cartCount, setCartCount] = useState<number>(0);
   const [ownedThemeIds, setOwnedThemeIds] = useState<string[]>([]);
   
+  // State cho Toast
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastIcon, setToastIcon] = useState('checkmark-circle');
+  const [toastColor, setToastColor] = useState('#10B981');
+  
   const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:8000/api/v1';
 
   // Lấy danh sách theme đã sở hữu
@@ -247,11 +254,10 @@ export default function StoreScreen() {
       // Kiểm tra đã sở hữu chưa
       if (ownedThemeIds.includes(themeId)) {
         // Hiển thị thông báo nhẹ nhàng
-        Alert.alert(
-          'Đã sở hữu',
-          'Bạn đã sở hữu theme này rồi!',
-          [{ text: 'Đã hiểu', style: 'default' }]
-        );
+        setToastMessage('Bạn đã sở hữu theme này');
+        setToastIcon('information-circle');
+        setToastColor('#3B82F6');
+        setToastVisible(true);
         return;
       }
       
@@ -275,62 +281,43 @@ export default function StoreScreen() {
         // Cập nhật lại badge giỏ hàng
         await refreshCartBadge();
         
-        // Hiển thị thông báo thành công
-        Alert.alert(
-          'Thành công',
-          'Đã thêm theme vào giỏ hàng!',
-          [
-            {
-              text: 'Đi đến giỏ hàng',
-              onPress: async () => {
-                // Đảm bảo làm mới giỏ hàng trước khi chuyển hướng
-                try {
-                  // Gọi API refreshCart một lần nữa để đảm bảo dữ liệu mới nhất
-                  const refreshResponse = await axios.get(`${API_URL}/cart/refresh`, {
-                    headers: {
-                      'Authorization': `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                      'Accept': 'application/json',
-                      'device-id': 'vnipet-mobile-app',
-                      'app-version': '1.0.0',
-                      'platform': 'ios', 
-                      'os-version': '14.0',
-                      'device-type': 'mobile',
-                      'User-Agent': 'VnipetApp/1.0 iOS/14.0',
-                    }
-                  });
-
-                  console.log('[PRE-NAVIGATION] Cart refresh response:', 
-                    refreshResponse.data?.success, 
-                    'items:', refreshResponse.data?.data?.items?.length || 0
-                  );
-                } catch (err) {
-                  console.error('[PRE-NAVIGATION] Error refreshing cart:', err);
-                }
-                
-                // Thêm timestamp để đảm bảo Cart luôn được refresh khi mở
-                const ts = new Date().getTime();
-                router.push({ pathname: '/cart', params: { ts, forceRefresh: 'true' } });
-              },
-            },
-            {
-              text: 'Tiếp tục mua sắm',
-              style: 'cancel',
-            },
-          ]
-        );
+        // Cập nhật số lượng giỏ hàng ngay lập tức để hiển thị badge
+        let newCartCount = cartCount + 1;
+        if (response.data.data && response.data.data.items) {
+          newCartCount = response.data.data.items.length;
+        }
+        
+        // Cập nhật state và lưu vào AsyncStorage
+        setCartCount(newCartCount);
+        await AsyncStorage.setItem('@vnipet_cart_count', newCartCount.toString());
+        console.log('[ADD] Updated cart count:', newCartCount);
+        
+        // Hiển thị toast thành công
+        setToastMessage('Đã thêm vào giỏ hàng');
+        setToastIcon('checkmark-circle');
+        setToastColor('#10B981');
+        setToastVisible(true);
       } else {
-        Alert.alert('Lỗi', response.data.message || 'Không thể thêm theme vào giỏ hàng');
+        setToastMessage(response.data.message || 'Không thể thêm vào giỏ hàng');
+        setToastIcon('alert-circle');
+        setToastColor('#EF4444');
+        setToastVisible(true);
       }
     } catch (err: any) {
       console.error('Lỗi khi thêm vào giỏ hàng:', err);
       if (err.response?.data?.message === 'Theme đã có trong giỏ hàng') {
-        Alert.alert('Thông báo', 'Theme đã có trong giỏ hàng!');
+        setToastMessage('Theme đã có trong giỏ hàng');
+        setToastIcon('information-circle');
+        setToastColor('#F59E0B');
+        setToastVisible(true);
       } else {
         console.log('Lỗi:', err.response?.data?.message || err.message);
         // Chỉ hiện lỗi khi không phải theme đã sở hữu
         if (err.response?.data?.message !== 'Bạn đã sở hữu theme này') {
-          Alert.alert('Lỗi', err.response?.data?.message || err.message || 'Có lỗi xảy ra khi thêm vào giỏ hàng');
+          setToastMessage(err.response?.data?.message || 'Có lỗi xảy ra');
+          setToastIcon('alert-circle');
+          setToastColor('#EF4444');
+          setToastVisible(true);
         }
       }
     } finally {
@@ -460,6 +447,16 @@ export default function StoreScreen() {
   // Làm mới badge giỏ hàng
   async function refreshCartBadge() {
     try {
+      // Đầu tiên, thử đọc từ AsyncStorage để cập nhật ngay lập tức
+      const storedCount = await AsyncStorage.getItem('@vnipet_cart_count');
+      if (storedCount) {
+        const count = parseInt(storedCount, 10);
+        if (!isNaN(count)) {
+          setCartCount(count);
+          console.log('[CART BADGE] Loaded from AsyncStorage:', count);
+        }
+      }
+      
       const token = await AsyncStorage.getItem('@vnipet_access_token');
       
       if (!token) {
@@ -477,12 +474,22 @@ export default function StoreScreen() {
           'os-version': '14.0',
           'device-type': 'mobile',
           'User-Agent': 'VnipetApp/1.0 iOS/14.0',
-        }
+          // Thêm cache control headers
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        // Thêm tham số để tránh cache
+        params: { _nocache: new Date().getTime() }
       });
       
       if (response.data && response.data.success && response.data.data?.items) {
-        console.log('Cart items length:', response.data.data.items.length);
-        setCartCount(response.data.data.items.length);
+        const newCount = response.data.data.items.length;
+        console.log('[CART BADGE] Cart items count from API:', newCount);
+        setCartCount(newCount);
+        
+        // Lưu vào AsyncStorage để các màn hình khác có thể truy cập
+        await AsyncStorage.setItem('@vnipet_cart_count', newCount.toString());
       }
     } catch (error) {
       console.error('Lỗi khi lấy thông tin giỏ hàng:', error);
@@ -580,6 +587,16 @@ export default function StoreScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Toast Notification */}
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        icon={toastIcon}
+        iconColor={toastColor}
+        duration={500}
+        onHide={() => setToastVisible(false)}
+      />
       
       {/* Modern Header */}
       <LinearGradient
